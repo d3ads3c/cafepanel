@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import NavBar from "@/components/NavBar";
+import MobileHead from "@/components/HeadBar";
 
 import "../globals.css";
 
@@ -15,6 +16,7 @@ export default function MainLayout({
 }>) {
   return (
     <div>
+      <MobileHead/>
       {children}
       <NavBar />
     </div>

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-
+@import "../node_modules/@flaticon/flaticon-uicons/css/all/all.css";
 
 :root {
   --background: #ffffff;
