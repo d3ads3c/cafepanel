@@ -1,6 +1,6 @@
 export default function MainBox() {
     return (
-        <div>
+        <div className="mt-20">
             <div className="px-5 pt-5">
                 <h1>مدیریت صندوق</h1>
             </div>
@@ -17,7 +17,7 @@ export default function MainBox() {
             </div>
             <div className="space-y-3 p-5">
                 <div className="space-y-3">
-                    <div className="border rounded-xl p-5 border-gray-300 space-y-7">
+                    <div className=" rounded-2xl p-5 border-gray-200 space-y-7 bg-white">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <p className="text-gray-300 font-light">#1341 - </p>

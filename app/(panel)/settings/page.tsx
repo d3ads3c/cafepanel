@@ -1,0 +1,99 @@
+import Link from "next/link";
+
+export default function SettingPage() {
+  return (
+    <div>
+      <div className="h-[350px] w-full pt-10 bg-center bg-no-repeat bg-cover bg-[url('/img/HeadBG.png')] flex items-center justify-center">
+        <div className="space-y-3 text-center">
+          <div className="rounded-2xl size-20 bg-gray-100 text-4xl flex items-center justify-center mx-auto">
+            <i className="fi fi-br-store-alt mt-1.5 text-teal-500"></i>
+          </div>
+          <div>
+            <h2 className="text-2xl text-white font-bold">فروشگاه رادیکال</h2>
+          </div>
+          <div className="flex items-center gap-4 justify-center text-white">
+            <p>لایسنس</p>
+            <p>|</p>
+            <div className="bg-teal-100 text-teal-500 rounded-full w-fit py-1 px-4">
+              آزمایشی
+            </div>
+          </div>
+          <div className="!mt-5">
+            <Link
+              href={"#"}
+              className="text-white bg-gray-700/30 backdrop-blur-2xl rounded-full py-1 px-4 w-fit flex items-center gap-2 justify-between mx-auto"
+            >
+              <i className="fi fi-br-link-alt mt-1.5"></i>
+              تمدید لایسنس
+            </Link>
+          </div>
+        </div>
+      </div>
+      <div className="p-5 min-h-[200px] w-full">
+        <div className="-mt-12 bg-white rounded-lg">
+          <div className="flex items-center justify-between text-gray-700 font-light p-3">
+            <div className="flex items-center gap-3">
+              <div className="mt-1">
+                <i className="fi fi-rr-user-pen text-xl"></i>
+              </div>
+              <div>
+                <p>اطلاعات کاربر</p>
+              </div>
+            </div>
+            <div className="text-left mt-1.5">
+              <i className="fi fi-sr-angle-small-left"></i>
+            </div>
+          </div>
+          <div className="w-[90%] h-[1px] bg-gray-100 mx-auto"></div>
+          <div className="flex items-center justify-between text-gray-700 font-light p-3">
+            <div className="flex items-center gap-3">
+              <div className="mt-1">
+                <i className="fi fi-sr-fingerprint text-xl"></i>
+              </div>
+              <div>
+                <p>امنیت</p>
+              </div>
+            </div>
+            <div className="text-left mt-1.5">
+              <i className="fi fi-sr-angle-small-left"></i>
+            </div>
+          </div>
+        </div>
+        <div className="mt-5 bg-white rounded-lg">
+          <div className="flex items-center justify-between text-gray-700 font-light p-3">
+            <div className="flex items-center gap-3">
+              <div className="mt-1">
+                <i className="fi fi-rr-member-list text-xl"></i>
+              </div>
+              <div>
+                <p>کاربران</p>
+              </div>
+            </div>
+            <div className="text-left mt-1.5">
+              <i className="fi fi-sr-angle-small-left"></i>
+            </div>
+          </div>
+          <div className="w-[90%] h-[1px] bg-gray-100 mx-auto"></div>
+          <div className="flex items-center justify-between text-gray-700 font-light p-3">
+            <div className="flex items-center gap-3">
+              <div className="mt-1">
+                <i className="fi fi-rr-customize-computer text-xl"></i>
+              </div>
+              <div>
+                <p>قالب منو</p>
+              </div>
+            </div>
+            <div>
+              <div className="bg-gray-100 w-fit py-1 px-4 text-sm rounded-full text-gray-400">
+                به زودی
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-5 bg-gray-50 py-3 text-sm text-gray-300 rounded-lg text-center">
+          <p>نسخه : 0.8</p>
+        </div>
+      </div>
+    </div>
+  );
+}

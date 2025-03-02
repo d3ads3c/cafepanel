@@ -1,5 +1,8 @@
-@import "tailwindcss";
-@import "../node_modules/@flaticon/flaticon-uicons/css/all/all.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import "~@flaticon/flaticon-uicons/css/all/all";
+
 
 :root {
   --background: #ffffff;
@@ -16,4 +19,8 @@
 body {
   color: var(--foreground);
   background: var(--background);
+}
+
+.hide-scroll::-webkit-scrollbar{
+  display: none;
 }

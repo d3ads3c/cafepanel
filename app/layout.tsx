@@ -35,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fa" dir="rtl" className="">
-      <body className={`${vazir.className} antialiased`}>
+      <body className={`${vazir.className} antialiased hide-scroll`}>
         {children}
       </body>
     </html>
