@@ -3,7 +3,6 @@
 @tailwind utilities;
 @import "~@flaticon/flaticon-uicons/css/all/all";
 
-
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -21,6 +20,10 @@ body {
   background: var(--background);
 }
 
-.hide-scroll::-webkit-scrollbar{
+.hide-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.custom-scroll {
+  scrollbar-color: teal white;
 }
