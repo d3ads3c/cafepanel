@@ -1,5 +1,5 @@
-import MainBox from "@/components/box/MainBox"
+import MainOrders from "@/components/orders/MainOrders"
 
-export default function BoxPage() {
-    return <MainBox />
+export default function OrdersPage() {
+    return <MainOrders />
 }

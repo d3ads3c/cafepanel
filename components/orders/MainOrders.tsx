@@ -1,4 +1,4 @@
-export default function MainBox() {
+export default function MainOrders() {
     return (
         <div className="mt-20">
             <div className="px-5 pt-5">

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function DashboardPage() {
   return (
     <div className="mt-20">
@@ -17,6 +19,34 @@ export default function DashboardPage() {
             <div className="mt-3">
               <p className="text-xs text-gray-500">درآمد امروز</p>
             </div>
+          </div>
+        </div>
+        <div className="my-5">
+          <div className="flex items-center gap-3">
+            <div className="min-w-[70px] space-y-2">
+              <div className="bg-white size-16 rounded-xl flex items-center justify-center text-2xl text-teal-500 mx-auto">
+                <i className="fi fi-br-warehouse-alt mt-3"></i>
+              </div>
+              <div className="text-center text-xs font-light text-gray-700">
+                <p>انبارداری</p>
+              </div>
+            </div>
+            <div className="min-w-[70px] space-y-2">
+              <div className="bg-white size-16 rounded-xl flex items-center justify-center text-2xl text-teal-500 mx-auto">
+                <i className="fi fi-br-shopping-cart-add mt-3"></i>
+              </div>
+              <div className="text-center text-xs font-light text-gray-700">
+                <p>خرید</p>
+              </div>
+            </div>
+            <Link href={"/box"} className="min-w-[70px] space-y-2">
+              <div className="bg-white size-16 rounded-xl flex items-center justify-center text-2xl text-teal-500 mx-auto">
+                <i className="fi fi-bs-cash-register mt-3"></i>
+              </div>
+              <div className="text-center text-xs font-light text-gray-700">
+                <p>صندوق ها</p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>
