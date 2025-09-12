@@ -20,10 +20,10 @@ export default function BoxLists() {
         <h2 className="text-sm text-gray-600">مدیریت صندوق ها</h2>
       </div>
       <div className="space-y-4 px-5">
-        <div className="bg-white p-5 rounded-2xl">
+        <div className="bg-white p-5 rounded-3xl border border-gray-200">
           <div className="flex justify-between items-center gap-2">
             <div className="flex justify-between items-center gap-2">
-              <div className="size-12 rounded-xl flex items-center justify-center text-xl bg-teal-100 text-teal-500">
+              <div className="size-12 rounded-xl flex items-center justify-center text-xl bg-teal-100 text-teal-400">
                 <i className="fi fi-bs-cash-register mt-1"></i>
               </div>
               <div>
@@ -32,7 +32,7 @@ export default function BoxLists() {
               </div>
             </div>
             <div>
-              <div className="text-sm bg-teal-100 text-teal-500 rounded-full w-fit px-4 py-1">
+              <div className="text-sm bg-teal-100 text-teal-400 rounded-full w-fit px-4 py-1">
                 فعال
               </div>
             </div>
@@ -52,7 +52,7 @@ export default function BoxLists() {
           <div className="">
             <button
               type="button"
-              className="border border-teal-500 rounded-xl p-3 w-full text-teal-500 hover:bg-teal-500 hover:text-white duration-150"
+              className="border border-teal-400 rounded-xl p-3 w-full text-teal-400 hover:bg-teal-400 hover:text-white duration-150"
             >
               ویرایش
             </button>
@@ -61,7 +61,7 @@ export default function BoxLists() {
       </div>
       <button
         onClick={toggleDrawer}
-        className="fixed bottom-24 right-3 bg-teal-500 text-white rounded-full size-16 z-20 shadow-teal-100 shadow-xl flex items-center justify-center border border-white"
+        className="fixed bottom-24 right-3 bg-teal-400 text-white rounded-full size-16 z-20 shadow-teal-100 shadow-xl flex items-center justify-center border border-white"
       >
         <i className="fi fi-rr-add text-3xl mt-2.5"></i>
       </button>
@@ -90,7 +90,7 @@ export default function BoxLists() {
             <div className="text-center">
               <button
                 type="button"
-                className="text-white bg-teal-500 rounded-lg py-3 w-full shadow-xl shadow-teal-100"
+                className="text-white bg-teal-400 rounded-lg py-3 w-full shadow-xl shadow-teal-100"
               >
                 ثبت صندوق جدید
               </button>

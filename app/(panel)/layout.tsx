@@ -21,7 +21,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="bg-gray-100 min-h-screen hide-scroll">
+    <div className="bg-white min-h-screen hide-scroll pb-32">
       <MobileHead />
       {children}
       <NavBar />
