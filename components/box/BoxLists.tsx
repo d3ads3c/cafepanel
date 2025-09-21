@@ -15,11 +15,11 @@ export default function BoxLists() {
     setIsDrawerOpen(!isDrawerOpen);
   };
   return (
-    <div className="mt-20 space-y-2">
-      <div className="px-5 py-6 flex">
-        <h2 className="text-sm text-gray-600">مدیریت صندوق ها</h2>
+    <div className="xl:mt-0 mt-20 space-y-2">
+      <div className="xl:px-0 px-5 py-6 flex">
+        <h2 className="text-sm xl:text-base text-gray-600 font-medium">مدیریت صندوق ها</h2>
       </div>
-      <div className="space-y-4 px-5">
+      <div className="space-y-4 xl:px-0 px-5">
         <div className="bg-white p-5 rounded-3xl border border-gray-200">
           <div className="flex justify-between items-center gap-2">
             <div className="flex justify-between items-center gap-2">

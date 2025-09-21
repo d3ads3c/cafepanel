@@ -4,10 +4,10 @@ import pool from '@/lib/db';
 // PUT - Update order status and items
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = params.id;
+    const { id: orderId } = await params;
     const body = await request.json();
     
     // Validate required fields
@@ -88,8 +88,8 @@ export async function PUT(
       console.log('Order updated:', {
         orderId,
         status: body.status,
-        totalItems: body.totalItems,
-        totalPrice: body.totalPrice,
+        totalItems: totalItems,
+        totalPrice: totalPrice,
         itemsCount: body.items?.length || 0
       });
 
@@ -99,8 +99,8 @@ export async function PUT(
         data: {
           id: orderId,
           status: body.status,
-          totalItems: body.totalItems,
-          totalPrice: body.totalPrice
+          totalItems: totalItems,
+          totalPrice: totalPrice
         }
       });
 
@@ -126,10 +126,10 @@ export async function PUT(
 // DELETE - Delete order
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = params.id;
+    const { id: orderId } = await params;
     const connection = await pool.getConnection();
     
     try {

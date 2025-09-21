@@ -79,6 +79,49 @@ CREATE TABLE order_items (
 );
 ```
 
+Create the `customers` table:
+
+```sql
+CREATE TABLE customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL UNIQUE,
+    email VARCHAR(255),
+    address TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE tables (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    table_number VARCHAR(50) NOT NULL UNIQUE,
+    capacity INT DEFAULT 4,
+    location VARCHAR(255),
+    description TEXT,
+    status ENUM('available', 'occupied', 'reserved', 'maintenance') DEFAULT 'available',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+**Note**: The current implementation uses name-based matching between customers and orders. To add proper foreign key relationships, run these commands:
+
+```sql
+-- Add customer_id column to orders table
+ALTER TABLE orders ADD COLUMN customer_id INT;
+
+-- Add foreign key constraint
+ALTER TABLE orders ADD FOREIGN KEY (customer_id) REFERENCES customers(id);
+
+-- Update existing orders to link to customers (optional)
+UPDATE orders o 
+JOIN customers c ON o.customer_name = c.name 
+SET o.customer_id = c.id;
+```
+
+**Current Working State**: The customer API works by matching `customers.name` with `orders.customer_name` until the foreign key relationship is established.
+
 ### 4. Database Connection
 The application uses a connection pool for better performance. The configuration is in `lib/db.ts`.
 
@@ -87,6 +130,7 @@ The application uses a connection pool for better performance. The configuration
 - Menu listing: `GET /api/menu/all`
 - Categories: `GET /api/categories`
 - Orders: `POST /api/orders` (create), `GET /api/orders` (list)
+- Customers: `GET /api/customers` (list), `POST /api/customers` (create), `PUT /api/customers/[id]` (update), `DELETE /api/customers/[id]` (delete)
 
 ### 6. Data Flow
 1. Form data is submitted with optional image
@@ -122,3 +166,13 @@ The application uses a connection pool for better performance. The configuration
 - `item_price`: Item price (stored for historical reference)
 - `quantity`: Quantity of the item
 - `created_at`: Creation timestamp
+
+### 10. Customers Table Fields
+- `id`: Auto-increment primary key
+- `name`: Customer full name (required)
+- `phone`: Customer phone number (required, unique)
+- `email`: Customer email address (optional)
+- `address`: Customer address (optional)
+- `notes`: Additional notes about customer (optional)
+- `created_at`: Creation timestamp
+- `updated_at`: Last update timestamp

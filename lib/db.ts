@@ -8,8 +8,10 @@ const dbConfig = {
   database: process.env.DB_NAME || 'cafepanel',
   port: parseInt(process.env.DB_PORT || '3306'),
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 20,
   queueLimit: 0,
+  acquireTimeout: 60000,
+  timeout: 60000,
 };
 
 // Create connection pool

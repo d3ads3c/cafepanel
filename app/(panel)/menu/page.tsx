@@ -61,31 +61,31 @@ export default function MenuItems() {
   );
 
   return (
-    <div className="mt-20">
-      <div className="px-5 pt-5 flex items-center justify-between">
-        <h1 className="font-bold">آیتم های منو</h1>
+    <div className="xl:mt-0 mt-20">
+      <div className="xl:px-0 px-5 pt-5 flex items-center justify-between">
+        <h1 className="font-bold text-lg xl:text-xl">آیتم های منو</h1>
         <Link
           href={"/menu/new"}
-          className="py-2 px-5 rounded-xl bg-teal-400 text-white text-sm shadow-xl shadow-teal-100"
+          className="py-2 px-5 rounded-xl bg-teal-400 text-white text-sm xl:text-base shadow-xl shadow-teal-100 hover:bg-teal-500 transition-colors"
         >
           آیتم جدید
         </Link>
       </div>
 
-      <div className="px-5 pt-5">
+      <div className="xl:px-0 px-5 pt-5">
         <div className="flex items-center bg-gray-100 rounded-xl w-full px-4">
           <i className="fi fi-br-search text-gray-400 mt-1.5"></i>
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-[95%] p-3.5 text-sm bg-transparent focus:outline-none"
+            className="w-[95%] p-3.5 text-sm xl:text-base bg-transparent focus:outline-none"
             placeholder="جستوجو"
           />
         </div>
       </div>
 
-      <div className="px-5 pt-5">
+      <div className="xl:px-0 px-5 pt-5">
         {loading ? (
           <div className="flex items-center justify-center py-10">
             <div className="text-gray-500">در حال بارگذاری...</div>
@@ -109,9 +109,9 @@ export default function MenuItems() {
             </div>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-5">
             {filteredItems.map((item) => (
-              <div key={item.id} className="w-full rounded-3xl border p-3">
+              <div key={item.id} className="w-full rounded-3xl border p-3 hover:shadow-lg transition-shadow">
                 <div className="flex items-center gap-5">
                   <div className="w-1/3">
                     {item.image ? (
@@ -133,21 +133,21 @@ export default function MenuItems() {
                   </div>
                   <div className="w-2/3">
                     {item.categoryName && (
-                      <p className="text-xs text-teal-500 mb-1">
+                      <p className="text-xs xl:text-sm text-teal-500 mb-1">
                         {item.categoryName}
                       </p>
                     )}
-                    <h2 className="font-bold">{item.name}</h2>
-                    <p className="text-sm text-gray-400 font-light">
+                    <h2 className="font-bold text-sm xl:text-base">{item.name}</h2>
+                    <p className="text-sm xl:text-base text-gray-400 font-light">
                       {item.info}
                     </p>
-                    <h3 className="mt-3">{formatPrice(item.price)} تومان</h3>
+                    <h3 className="mt-3 text-sm xl:text-base font-medium">{formatPrice(item.price)} تومان</h3>
                   </div>
                 </div>
                 <div className="mt-4">
                   <Link
                     href={`/menu/edit/${item.id}`}
-                    className="block text-white bg-teal-400 py-3 rounded-2xl w-full text-center"
+                    className="block text-white bg-teal-400 py-3 rounded-2xl w-full text-center hover:bg-teal-500 transition-colors"
                   >
                     ویرایش
                   </Link>

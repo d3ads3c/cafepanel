@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
 export async function GET(request: NextRequest) {
+  let connection;
   try {
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
     
     const selectQuery = `
       SELECT 
@@ -50,5 +51,10 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     );
+  } finally {
+    // Ensure connection is released even if an error occurs
+    if (connection) {
+      connection.release();
+    }
   }
 }

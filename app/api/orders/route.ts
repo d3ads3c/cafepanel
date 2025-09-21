@@ -3,8 +3,9 @@ import pool from '@/lib/db';
 
 // GET - Fetch all orders
 export async function GET(request: NextRequest) {
+  let connection;
   try {
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
     
     const selectQuery = `
       SELECT 
@@ -61,6 +62,10 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     );
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 }
 

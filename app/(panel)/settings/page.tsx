@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function SettingPage() {
   return (
-    <div>
+    <div className="xl:mt-0 mt-20">
       <div className="h-[370px] w-full pt-14 bg-center bg-no-repeat bg-cover bg-[url('/img/HeadBG.png')] flex items-center justify-center">
         <div className="space-y-3 text-center">
           <div className="rounded-2xl size-20 bg-gray-100 text-4xl flex items-center justify-center mx-auto">
@@ -29,15 +29,15 @@ export default function SettingPage() {
           </div>
         </div>
       </div>
-      <div className="p-5 min-h-[200px] w-full">
-        <div className="-mt-12 bg-white rounded-lg">
-          <div className="flex items-center justify-between text-gray-700 font-light p-3">
+      <div className="xl:px-0 p-5 min-h-[200px] w-full">
+        <div className="-mt-12 bg-white rounded-lg shadow-box">
+          <div className="flex items-center justify-between text-gray-700 font-light p-3 hover:bg-gray-50 transition-colors cursor-pointer">
             <div className="flex items-center gap-3">
               <div className="mt-1">
                 <i className="fi fi-rr-user-pen text-xl"></i>
               </div>
               <div>
-                <p>اطلاعات کاربر</p>
+                <p className="text-sm xl:text-base">اطلاعات کاربر</p>
               </div>
             </div>
             <div className="text-left mt-1.5">
@@ -45,13 +45,13 @@ export default function SettingPage() {
             </div>
           </div>
           <div className="w-[90%] h-[1px] bg-gray-100 mx-auto"></div>
-          <div className="flex items-center justify-between text-gray-700 font-light p-3">
+          <div className="flex items-center justify-between text-gray-700 font-light p-3 hover:bg-gray-50 transition-colors cursor-pointer">
             <div className="flex items-center gap-3">
               <div className="mt-1">
                 <i className="fi fi-sr-fingerprint text-xl"></i>
               </div>
               <div>
-                <p>امنیت</p>
+                <p className="text-sm xl:text-base">امنیت</p>
               </div>
             </div>
             <div className="text-left mt-1.5">
@@ -59,27 +59,27 @@ export default function SettingPage() {
             </div>
           </div>
         </div>
-        <div className="mt-5 bg-white rounded-lg">
-          <Link href={"/settings/categories"} className="flex items-center justify-between text-gray-700 font-light p-3">
+        <div className="mt-5 bg-white rounded-lg shadow-box">
+          <Link href={"/settings/categories"} className="flex items-center justify-between text-gray-700 font-light p-3 hover:bg-gray-50 transition-colors">
             <div className="flex items-center gap-3">
               <div className="mt-1">
                 <i className="fi fi-rr-boxes text-xl"></i>
               </div>
               <div>
-                <p>دسته بندی ها</p>
+                <p className="text-sm xl:text-base">دسته بندی ها</p>
               </div>
             </div>
             <div className="text-left mt-1.5">
               <i className="fi fi-sr-angle-small-left"></i>
             </div>
           </Link>
-          <div className="flex items-center justify-between text-gray-700 font-light p-3">
+          <div className="flex items-center justify-between text-gray-700 font-light p-3 hover:bg-gray-50 transition-colors cursor-pointer">
             <div className="flex items-center gap-3">
               <div className="mt-1">
                 <i className="fi fi-rr-member-list text-xl"></i>
               </div>
               <div>
-                <p>کاربران</p>
+                <p className="text-sm xl:text-base">کاربران</p>
               </div>
             </div>
             <div className="text-left mt-1.5">
@@ -87,13 +87,13 @@ export default function SettingPage() {
             </div>
           </div>
           <div className="w-[90%] h-[1px] bg-gray-100 mx-auto"></div>
-          <div className="flex items-center justify-between text-gray-700 font-light p-3">
+          <div className="flex items-center justify-between text-gray-700 font-light p-3 hover:bg-gray-50 transition-colors cursor-pointer">
             <div className="flex items-center gap-3">
               <div className="mt-1">
                 <i className="fi fi-rr-customize-computer text-xl"></i>
               </div>
               <div>
-                <p>قالب منو</p>
+                <p className="text-sm xl:text-base">قالب منو</p>
               </div>
             </div>
             <div>
