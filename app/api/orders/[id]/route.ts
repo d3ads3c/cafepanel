@@ -25,36 +25,39 @@ export async function PUT(
       await connection.beginTransaction();
 
              // Update order status and totals
-       const updateOrderQuery = `
-         UPDATE orders 
-         SET order_status = ?, total_items = ?, total_price = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE order_ID = ?
-       `;
-       
-       // If only status is being updated (no items provided), preserve existing totals
-       let totalItems = body.totalItems;
-       let totalPrice = body.totalPrice;
-       
-       if (!body.items && (body.totalItems === undefined || body.totalPrice === undefined)) {
-         // Get existing totals from database
-         const [existingOrder] = await connection.execute(
-           'SELECT total_items, total_price FROM orders WHERE order_ID = ?',
-           [orderId]
-         );
-         
-         if (existingOrder && (existingOrder as any[])[0]) {
-           const order = (existingOrder as any[])[0];
-           totalItems = totalItems ?? order.total_items;
-           totalPrice = totalPrice ?? order.total_price;
-         }
-       }
-       
-       const [orderResult] = await connection.execute(updateOrderQuery, [
-         body.status, 
-         totalItems || 0, 
-         totalPrice || 0, 
-         orderId
-       ]);
+      // Support payment_method
+      const updateOrderQuery = `
+        UPDATE orders 
+        SET order_status = ?, total_items = ?, total_price = ?, updated_at = CURRENT_TIMESTAMP, payment_method = ?
+        WHERE order_ID = ?
+      `;
+
+      // If only status is being updated (no items provided), preserve existing totals
+      let totalItems = body.totalItems;
+      let totalPrice = body.totalPrice;
+      let paymentMethod = body.paymentMethod ?? null;
+
+      if (!body.items && (body.totalItems === undefined || body.totalPrice === undefined)) {
+        // Get existing totals and payment_method from database
+        const [existingOrder] = await connection.execute(
+          'SELECT total_items, total_price, payment_method FROM orders WHERE order_ID = ?',
+          [orderId]
+        );
+        if (existingOrder && (existingOrder as any[])[0]) {
+          const order = (existingOrder as any[])[0];
+          totalItems = totalItems ?? order.total_items;
+          totalPrice = totalPrice ?? order.total_price;
+          paymentMethod = paymentMethod ?? order.payment_method;
+        }
+      }
+
+      const [orderResult] = await connection.execute(updateOrderQuery, [
+        body.status,
+        totalItems || 0,
+        totalPrice || 0,
+        paymentMethod,
+        orderId
+      ]);
 
       // If items are provided, update order items
       if (body.items && Array.isArray(body.items)) {
@@ -90,6 +93,7 @@ export async function PUT(
         status: body.status,
         totalItems: totalItems,
         totalPrice: totalPrice,
+        paymentMethod,
         itemsCount: body.items?.length || 0
       });
 
@@ -100,7 +104,8 @@ export async function PUT(
           id: orderId,
           status: body.status,
           totalItems: totalItems,
-          totalPrice: totalPrice
+          totalPrice: totalPrice,
+          paymentMethod
         }
       });
 

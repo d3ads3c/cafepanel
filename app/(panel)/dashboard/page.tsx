@@ -475,10 +475,10 @@ export default function DashboardPage() {
                   fetchDashboardData();
                   setLastRefresh(new Date());
                 }}
-                className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
+                className="size-10 mt-1 flex items-center justify-center rounded-lg bg-white/20 hover:bg-white/30 transition-colors"
                 title="به‌روزرسانی داده‌ها"
               >
-                <i className="fi fi-rr-refresh text-white"></i>
+                <i className="fi fi-rr-refresh mt-1.5 text-white"></i>
               </button>
               <div className="text-right">
                 <p className="text-teal-100 text-sm">امروز</p>
@@ -515,7 +515,7 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="w-12 h-12 xl:w-14 xl:h-14 bg-teal-100 rounded-xl flex items-center justify-center">
-                <i className="fi fi-rr-money text-teal-600 text-xl xl:text-2xl"></i>
+                <i className="fi fi-rr-money mt-2 text-teal-600 text-xl xl:text-2xl"></i>
               </div>
             </div>
           </div>
@@ -530,7 +530,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-green-500 mt-1">سفارش</p>
               </div>
               <div className="w-12 h-12 xl:w-14 xl:h-14 bg-blue-100 rounded-xl flex items-center justify-center">
-                <i className="fi fi-rr-shopping-cart text-blue-600 text-xl xl:text-2xl"></i>
+                <i className="fi fi-rr-shopping-cart mt-2 text-blue-600 text-xl xl:text-2xl"></i>
               </div>
             </div>
           </div>
@@ -545,7 +545,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-purple-500 mt-1">مشتری</p>
               </div>
               <div className="w-12 h-12 xl:w-14 xl:h-14 bg-purple-100 rounded-xl flex items-center justify-center">
-                <i className="fi fi-rr-users text-purple-600 text-xl xl:text-2xl"></i>
+                <i className="fi fi-rr-users mt-2 text-purple-600 text-xl xl:text-2xl"></i>
               </div>
             </div>
           </div>
@@ -560,7 +560,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-orange-500 mt-1">تومان</p>
               </div>
               <div className="w-12 h-12 xl:w-14 xl:h-14 bg-orange-100 rounded-xl flex items-center justify-center">
-                <i className="fi fi-rr-chart-line text-orange-600 text-xl xl:text-2xl"></i>
+                <i className="fi fi-rr-chart-simple mt-2 text-orange-600 text-xl xl:text-2xl"></i>
               </div>
             </div>
           </div>

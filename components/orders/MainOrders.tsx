@@ -331,8 +331,41 @@ export default function MainOrders() {
     });
   };
 
-  const applyOrderChanges = async () => {
+  const applyOrderChanges = async (closeModalOnSuccess = true, overrideItems = null) => {
     if (!selectedOrder) return;
+
+    // Use overrideItems if provided, otherwise merge newItemsToAdd with selectedOrder.items
+    let mergedItems = overrideItems ? [...overrideItems] : [...selectedOrder.items];
+    if (!overrideItems && Object.keys(newItemsToAdd).length > 0) {
+      for (const itemIdStr of Object.keys(newItemsToAdd)) {
+        const itemId = parseInt(itemIdStr);
+        const quantityToAdd = newItemsToAdd[itemId];
+        const item = items.find((itm) => itm.id === itemId);
+        if (!item) continue;
+        // Check if item already exists in order
+        const existingIdx = mergedItems.findIndex((orderItem) => orderItem.menu_ID === itemId);
+        if (existingIdx !== -1) {
+          // If exists, increase quantity
+          mergedItems[existingIdx] = {
+            ...mergedItems[existingIdx],
+            quantity: mergedItems[existingIdx].quantity + quantityToAdd,
+          };
+        } else {
+          // If not, add as new item
+          mergedItems.push({
+            order_item_ID: Date.now() + Math.floor(Math.random()*10000), // temp ID
+            menu_ID: item.id,
+            item_name: item.name,
+            item_price: parseFloat(item.price),
+            quantity: quantityToAdd,
+          });
+        }
+      }
+    }
+
+    // Recalculate totals
+    const totalItems = mergedItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalPrice = mergedItems.reduce((sum, item) => sum + (parseFloat(item.item_price) * item.quantity), 0);
 
     try {
       const res = await fetch(`/api/orders/${selectedOrder.id}`, {
@@ -342,9 +375,9 @@ export default function MainOrders() {
         },
         body: JSON.stringify({
           status: selectedOrder.status,
-          items: selectedOrder.items,
-          totalItems: selectedOrder.totalItems,
-          totalPrice: selectedOrder.totalPrice,
+          items: mergedItems,
+          totalItems,
+          totalPrice,
         }),
       });
 
@@ -352,7 +385,7 @@ export default function MainOrders() {
 
       if (data.success) {
         toast.success("تغییرات با موفقیت اعمال شد");
-        closeOrderModal();
+        if (closeModalOnSuccess) closeOrderModal();
         fetchOrders(); // Refresh orders list
       } else {
         toast.error(data.message || "خطا در اعمال تغییرات");
@@ -1035,10 +1068,10 @@ export default function MainOrders() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setViewMode(viewMode === "cards" ? "table" : "cards")}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
+              className="size-10 rounded-xl border border-gray-300 hover:bg-gray-50 transition-colors flex items-center justify-center"
               title={viewMode === "cards" ? "نمایش جدولی" : "نمایش کارتی"}
             >
-              <i className={`fi ${viewMode === "cards" ? "fi-rr-table" : "fi-rr-apps"} text-gray-600`}></i>
+              <i className={`fi ${viewMode === "cards" ? "fi-rr-table" : "fi-rr-apps"} text-gray-600 mt-1.5`}></i>
             </button>
           </div>
         </div>
@@ -1089,7 +1122,7 @@ export default function MainOrders() {
             {/* Search */}
             <div className="xl:col-span-2">
               <div className="relative">
-                <i className="fi fi-rr-search absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                <i className="fi fi-rr-search absolute right-4 top-1/2 mt-0.5 transform -translate-y-1/2 text-gray-400"></i>
                 <input
                   type="text"
                   placeholder="جستجو در شماره سفارش، نام مشتری یا شماره میز..."
@@ -1150,7 +1183,7 @@ export default function MainOrders() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center">
-                      <i className="fi fi-rr-shopping-cart text-teal-600 text-xl"></i>
+                      <i className="fi fi-rr-shopping-cart mt-1 text-teal-600 text-xl"></i>
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-800">#{order.id}</h3>
@@ -1226,7 +1259,7 @@ export default function MainOrders() {
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
-                            <i className="fi fi-rr-shopping-cart text-teal-600 text-sm"></i>
+                            <i className="fi fi-rr-shopping-cart mt-1 text-teal-600 text-sm"></i>
                           </div>
                           <span className="font-medium text-gray-800">#{order.id}</span>
                         </div>
@@ -1347,7 +1380,7 @@ export default function MainOrders() {
             <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-blue-50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-teal-500 rounded-xl flex items-center justify-center">
-                  <i className="fi fi-rr-plus text-white text-lg"></i>
+                  <i className="fi fi-rr-plus mt-2 text-white text-lg"></i>
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-800">سفارش جدید</h2>
@@ -1358,7 +1391,7 @@ export default function MainOrders() {
                 onClick={() => setIsModalOpen(false)}
                 className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors"
               >
-                <i className="fi fi-rr-cross text-gray-600 text-sm"></i>
+                <i className="fi fi-rr-cross mt-1 text-gray-600 text-sm"></i>
               </button>
             </div>
 
@@ -1374,7 +1407,7 @@ export default function MainOrders() {
                     </label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
-                        <i className="fi fi-rr-user absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <i className="fi fi-rr-user absolute right-3 mt-0.5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         <input
                           type="text"
                           name="customer"
@@ -1389,7 +1422,7 @@ export default function MainOrders() {
                         onClick={() => setIsCustomerModalOpen(true)}
                         className="px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors flex items-center gap-2"
                       >
-                        <i className="fi fi-rr-list text-sm"></i>
+                        <i className="fi fi-rr-list text-sm mt-0.5"></i>
                         انتخاب
                       </button>
                     </div>
@@ -1408,7 +1441,7 @@ export default function MainOrders() {
                     </label>
                     <div className="flex gap-2">
                       <div className="relative flex-1">
-                        <i className="fi fi-rr-table absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <i className="fi fi-rr-table absolute right-3 mt-0.5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         <input
                           type="text"
                           name="table"
@@ -1423,7 +1456,7 @@ export default function MainOrders() {
                         onClick={() => setIsTableModalOpen(true)}
                         className="px-4 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors flex items-center gap-2"
                       >
-                        <i className="fi fi-rr-list text-sm"></i>
+                        <i className="fi fi-rr-list mt-1 text-sm"></i>
                         انتخاب
                       </button>
                     </div>
@@ -1445,7 +1478,7 @@ export default function MainOrders() {
                 {/* Search */}
                 <div className="mb-4">
                   <div className="relative">
-                    <i className="fi fi-rr-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <i className="fi fi-rr-search absolute mt-0.5 right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                     <input
                       type="text"
                       name="search"
@@ -1514,7 +1547,7 @@ export default function MainOrders() {
                                 onClick={() => addItem(item.id)}
                                 className="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors flex items-center gap-2"
                               >
-                                <i className="fi fi-rr-plus text-xs"></i>
+                                <i className="fi fi-rr-plus mt-0.5 text-xs"></i>
                                 افزودن
                               </button>
                             ) : (
@@ -1523,7 +1556,7 @@ export default function MainOrders() {
                                   onClick={() => decreaseQuantity(item.id)}
                                   className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-colors"
                                 >
-                                  <i className="fi fi-rr-minus text-xs"></i>
+                                  <i className="fi fi-rr-minus mt-0.5 text-xs"></i>
                                 </button>
                                 <span className="text-lg font-bold text-gray-800 min-w-[30px] text-center">
                                   {getItemQuantity(item.id)}
@@ -1569,7 +1602,7 @@ export default function MainOrders() {
                     disabled={Object.keys(itemQuantities).length === 0}
                     className="px-6 py-3 bg-teal-500 text-white rounded-xl hover:bg-teal-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    <i className="fi fi-rr-check text-sm"></i>
+                    <i className="fi fi-rr-check mt-1 text-sm"></i>
                     ثبت سفارش
                   </button>
                 </div>
@@ -1587,7 +1620,7 @@ export default function MainOrders() {
             <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
-                  <i className="fi fi-rr-shopping-cart text-white text-lg"></i>
+                  <i className="fi fi-rr-shopping-cart mt-2 text-white text-lg"></i>
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-800">
@@ -1621,7 +1654,7 @@ export default function MainOrders() {
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <i className="fi fi-rr-user text-white text-sm"></i>
+                      <i className="fi fi-rr-user mt-1 text-white text-sm"></i>
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 font-medium">مشتری</p>
@@ -1635,7 +1668,7 @@ export default function MainOrders() {
                 <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                      <i className="fi fi-rr-table text-white text-sm"></i>
+                      <i className="fi fi-rr-table mt-1 text-white text-sm"></i>
                     </div>
                     <div>
                       <p className="text-xs text-green-600 font-medium">میز</p>
@@ -1649,7 +1682,7 @@ export default function MainOrders() {
                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                      <i className="fi fi-rr-money text-white text-sm"></i>
+                      <i className="fi fi-rr-money mt-1 text-white text-sm"></i>
                     </div>
                     <div>
                       <p className="text-xs text-purple-600 font-medium">مبلغ کل</p>
@@ -1663,7 +1696,7 @@ export default function MainOrders() {
                 <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                      <i className="fi fi-rr-clock text-white text-sm"></i>
+                      <i className="fi fi-rr-clock mt-1 text-white text-sm"></i>
                     </div>
                     <div>
                       <p className="text-xs text-orange-600 font-medium">وضعیت</p>
@@ -1700,7 +1733,16 @@ export default function MainOrders() {
                         </div>
                         <div className="flex items-center gap-3">
                           <button
-                            onClick={() => removeItemFromOrder(item.menu_ID)}
+                            onClick={async () => {
+                              // Create new items array with quantity decreased
+                              const newItems = selectedOrder.items.map((orderItem: any) =>
+                                orderItem.menu_ID === item.menu_ID
+                                  ? { ...orderItem, quantity: orderItem.quantity - 1 }
+                                  : orderItem
+                              ).filter((orderItem: any) => orderItem.quantity > 0);
+                              setSelectedOrder((prev: any) => ({ ...prev, items: newItems }));
+                              await applyOrderChanges(false, newItems);
+                            }}
                             className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-colors"
                           >
                             <i className="fi fi-rr-minus text-xs"></i>
@@ -1709,7 +1751,16 @@ export default function MainOrders() {
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => addItemToOrder(item.menu_ID)}
+                            onClick={async () => {
+                              // Create new items array with quantity increased
+                              const newItems = selectedOrder.items.map((orderItem: any) =>
+                                orderItem.menu_ID === item.menu_ID
+                                  ? { ...orderItem, quantity: orderItem.quantity + 1 }
+                                  : orderItem
+                              );
+                              setSelectedOrder((prev: any) => ({ ...prev, items: newItems }));
+                              await applyOrderChanges(false, newItems);
+                            }}
                             className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200 transition-colors"
                           >
                             <i className="fi fi-rr-plus text-xs"></i>
@@ -1725,7 +1776,7 @@ export default function MainOrders() {
               <div className="mb-16">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">افزودن آیتم جدید</h3>
                 <div className="relative mb-4">
-                  <i className="fi fi-rr-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                  <i className="fi fi-rr-search absolute right-3 mt-0.5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                   <input
                     type="text"
                     value={orderModalSearchTerm}
@@ -1845,15 +1896,7 @@ export default function MainOrders() {
                     <button
                       onClick={async () => {
                         try {
-                          // Add each item to the order
-                          for (const [itemId, quantity] of Object.entries(newItemsToAdd)) {
-                            for (let i = 0; i < quantity; i++) {
-                              addItemToOrder(parseInt(itemId));
-                            }
-                          }
-                          
-                          // Clear the new items
-                          setNewItemsToAdd({});
+                          await applyOrderChanges();
                           toast.success("آیتم‌های جدید با موفقیت اضافه شدند");
                         } catch (error) {
                           toast.error("خطا در افزودن آیتم‌ها");

@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
         o.total_items,
         o.total_price,
         o.order_status,
+        o.payment_method,
         o.created_at,
         o.updated_at,
         JSON_ARRAYAGG(
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
       totalItems: row.total_items,
       totalPrice: row.total_price,
       status: row.order_status,
+      paymentMethod: row.payment_method,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       items: row.items ? JSON.parse(row.items) : []

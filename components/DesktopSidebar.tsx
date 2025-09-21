@@ -32,12 +32,12 @@ export default function DesktopSidebar() {
       label: "منو",
       active: pathname === "/menu"
     },
-    {
-      href: "/box",
-      icon: "fi fi-bs-cash-register",
-      label: "صندوق ها",
-      active: pathname === "/box"
-    },
+    // {
+    //   href: "/box",
+    //   icon: "fi fi-bs-cash-register",
+    //   label: "صندوق ها",
+    //   active: pathname === "/box"
+    // },
     {
       href: "/settings",
       icon: "fi fi-rr-settings",
