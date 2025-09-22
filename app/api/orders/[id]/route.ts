@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
 // PUT - Update order status and items
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request
 ) {
   try {
-    const { id: orderId } = await params;
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/orders\/([^/]+)(?:\/)?$/);
+    const orderId = match?.[1];
     const body = await request.json();
     
     // Validate required fields
@@ -130,11 +131,12 @@ export async function PUT(
 
 // DELETE - Delete order
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  request: Request
 ) {
   try {
-    const { id: orderId } = await params;
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/orders\/([^/]+)(?:\/)?$/);
+    const orderId = match?.[1];
     const connection = await pool.getConnection();
     
     try {

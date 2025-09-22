@@ -1,12 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
     const connection = await pool.getConnection();
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/customers\/([^/]+)(?:\/)?$/);
+    const customerId = match?.[1];
     
     const selectQuery = `
       SELECT 
@@ -21,7 +23,7 @@ export async function GET(
       GROUP BY c.id
     `;
     
-    const [rows] = await connection.execute(selectQuery, [params.id]);
+    const [rows] = await connection.execute(selectQuery, [customerId]);
     connection.release();
 
     if ((rows as any[]).length === 0) {
@@ -45,11 +47,13 @@ export async function GET(
 }
 
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
     const { name, phone, email, address, notes, discount_type, discount_value } = await request.json();
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/customers\/([^/]+)(?:\/)?$/);
+    const customerId = match?.[1];
 
     if (!name || !phone) {
       return NextResponse.json(
@@ -63,7 +67,7 @@ export async function PUT(
     // Check if customer exists
     const [existingRows] = await connection.execute(
       "SELECT id FROM customers WHERE id = ?",
-      [params.id]
+      [customerId]
     );
 
     if ((existingRows as any[]).length === 0) {
@@ -77,7 +81,7 @@ export async function PUT(
     // Check if phone number is already used by another customer
     const [phoneCheckRows] = await connection.execute(
       "SELECT id FROM customers WHERE phone = ? AND id != ?",
-      [phone, params.id]
+      [phone, customerId]
     );
 
     if ((phoneCheckRows as any[]).length > 0) {
@@ -92,7 +96,7 @@ export async function PUT(
       `UPDATE customers 
        SET name = ?, phone = ?, email = ?, address = ?, notes = ?, discount_type = ?, discount_value = ?, updated_at = NOW()
        WHERE id = ?`,
-      [name, phone, email || null, address || null, notes || null, discount_type || null, discount_value ?? null, params.id]
+      [name, phone, email || null, address || null, notes || null, discount_type || null, discount_value ?? null, customerId]
     );
 
     connection.release();
@@ -111,16 +115,18 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
     const connection = await pool.getConnection();
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/customers\/([^/]+)(?:\/)?$/);
+    const customerId = match?.[1];
 
     // Check if customer exists
     const [existingRows] = await connection.execute(
       "SELECT id FROM customers WHERE id = ?",
-      [params.id]
+      [customerId]
     );
 
     if ((existingRows as any[]).length === 0) {
@@ -134,7 +140,7 @@ export async function DELETE(
     // Check if customer has orders
     const [customerNameRows] = await connection.execute(
       "SELECT name FROM customers WHERE id = ?",
-      [params.id]
+      [customerId]
     );
     
     if ((customerNameRows as any[]).length === 0) {
@@ -165,7 +171,7 @@ export async function DELETE(
       );
     }
 
-    await connection.execute("DELETE FROM customers WHERE id = ?", [params.id]);
+    await connection.execute("DELETE FROM customers WHERE id = ?", [customerId]);
     connection.release();
 
     return NextResponse.json({

@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
 // GET - Fetch single category
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
-    const categoryId = params.id;
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/categories\/([^/]+)(?:\/)?$/);
+    const categoryId = match?.[1];
     
     const connection = await pool.getConnection();
     
@@ -57,11 +58,12 @@ export async function GET(
 
 // PUT - Update category
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
-    const categoryId = params.id;
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/categories\/([^/]+)(?:\/)?$/);
+    const categoryId = match?.[1];
     const body = await request.json();
     
     // Validate required fields
@@ -136,11 +138,12 @@ export async function PUT(
 
 // DELETE - Delete category
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
-    const categoryId = params.id;
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/categories\/([^/]+)(?:\/)?$/);
+    const categoryId = match?.[1];
     
     const connection = await pool.getConnection();
     

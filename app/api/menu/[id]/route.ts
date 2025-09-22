@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
@@ -7,11 +7,12 @@ import pool from '@/lib/db';
 
 // GET - Fetch single menu item
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
-    const itemId = params.id;
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/menu\/([^/]+)(?:\/)?$/);
+    const itemId = match?.[1];
     
     const connection = await pool.getConnection();
     
@@ -74,11 +75,12 @@ export async function GET(
 
 // PUT - Update menu item
 export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
-    const itemId = params.id;
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/menu\/([^/]+)(?:\/)?$/);
+    const itemId = match?.[1];
     const body = await request.json();
     
     // Validate required fields
@@ -210,11 +212,12 @@ export async function PUT(
 
 // DELETE - Soft delete menu item (set status to 0)
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request
 ) {
   try {
-    const itemId = params.id;
+    const pathname = new URL(request.url).pathname;
+    const match = pathname.match(/\/api\/menu\/([^/]+)(?:\/)?$/);
+    const itemId = match?.[1];
     const connection = await pool.getConnection();
     try {
       const [result] = await connection.execute(

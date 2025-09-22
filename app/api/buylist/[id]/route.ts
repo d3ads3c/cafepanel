@@ -1,25 +1,29 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import pool from "@/lib/db";
 
 // PUT - Update status
-export async function PUT(
-  request: NextRequest,
-  context: { params: { id: string } } | Promise<{ params: { id: string } }>
-) {
-  // Await context if it's a promise
-  const { params } = await context;
+export async function PUT(request: Request) {
   const body = await request.json();
   const { bl_status } = body;
-  const statusString =
-    bl_status === true || bl_status === "true" ? "true" : "false";
-  const id = Number(params.id);
+  // Validate that bl_status is either a boolean or "true"/"false" string
+  const isValidStatus =
+    bl_status === true ||
+    bl_status === false ||
+    bl_status === "true" ||
+    bl_status === "false";
 
-  if (bl_status !== "true" && bl_status !== "false") {
+  if (!isValidStatus) {
     return NextResponse.json(
       { success: false, message: "وضعیت نامعتبر است" },
       { status: 400 }
     );
   }
+
+  const statusString = bl_status === true || bl_status === "true" ? "true" : "false";
+  const pathname = new URL(request.url).pathname;
+  const match = pathname.match(/\/api\/buylist\/([^/]+)(?:\/)?$/);
+  const idParam = match?.[1];
+  const id = Number(idParam);
 
   if (isNaN(id)) {
     return NextResponse.json(
@@ -50,11 +54,12 @@ export async function PUT(
 
 // DELETE - Remove item
 export async function DELETE(
-  request: NextRequest,
-  context: { params: { id: string } } | Promise<{ params: { id: string } }>
+  request: Request
 ) {
-  const { params } = await context;
-  const id = Number(params.id);
+  const pathname = new URL(request.url).pathname;
+  const match = pathname.match(/\/api\/buylist\/([^/]+)(?:\/)?$/);
+  const idParam = match?.[1];
+  const id = Number(idParam);
   if (isNaN(id)) {
     return NextResponse.json(
       { success: false, message: "شناسه نامعتبر است" },
