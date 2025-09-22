@@ -1,0 +1,63 @@
+import crypto from 'crypto'
+import { cookies } from 'next/headers'
+
+const DEFAULT_EXP_MS = 1000 * 60 * 60 * 24 * 7 // 7 days
+
+function getSecret(): string {
+  const secret = process.env.AUTH_SECRET || process.env.DB_PASSWORD || 'dev_secret'
+  return secret
+}
+
+export type AuthPayload = {
+  userId: number
+  username: string
+  permissions: string[]
+  exp: number
+}
+
+export function signPayload(payload: Omit<AuthPayload, 'exp'>, expMs: number = DEFAULT_EXP_MS): string {
+  const exp = Date.now() + expMs
+  const data = { ...payload, exp }
+  const json = JSON.stringify(data)
+  const b64 = Buffer.from(json).toString('base64url')
+  const hmac = crypto.createHmac('sha256', getSecret()).update(b64).digest('base64url')
+  return `${b64}.${hmac}`
+}
+
+export function verifyToken(token: string | undefined | null): AuthPayload | null {
+  if (!token) return null
+  const parts = token.split('.')
+  if (parts.length !== 2) return null
+  const [b64, sig] = parts
+  const expected = crypto.createHmac('sha256', getSecret()).update(b64).digest('base64url')
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null
+  try {
+    const json = Buffer.from(b64, 'base64url').toString('utf8')
+    const data = JSON.parse(json) as AuthPayload
+    if (Date.now() > data.exp) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
+export function setAuthCookie(token: string) {
+  cookies().set('auth_token', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7,
+  })
+}
+
+export function clearAuthCookie() {
+  cookies().set('auth_token', '', { path: '/', maxAge: 0 })
+}
+
+export function getAuth(): AuthPayload | null {
+  const token = cookies().get('auth_token')?.value
+  return verifyToken(token)
+}
+
+

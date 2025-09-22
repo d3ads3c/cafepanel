@@ -207,3 +207,43 @@ export async function PUT(
     );
   }
 }
+
+// DELETE - Soft delete menu item (set status to 0)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const itemId = params.id;
+    const connection = await pool.getConnection();
+    try {
+      const [result] = await connection.execute(
+        `UPDATE menu SET menu_status = 0 WHERE menu_ID = ?`,
+        [itemId]
+      );
+      connection.release();
+
+      if ((result as any).affectedRows === 0) {
+        return NextResponse.json(
+          { message: 'آیتم مورد نظر یافت نشد' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({ success: true, message: 'آیتم حذف شد' });
+    } catch (dbError) {
+      connection.release();
+      console.error('Database error:', dbError);
+      return NextResponse.json(
+        { message: 'خطا در حذف آیتم' },
+        { status: 500 }
+      );
+    }
+  } catch (error) {
+    console.error('Error deleting menu item:', error);
+    return NextResponse.json(
+      { message: 'خطا در پردازش درخواست' },
+      { status: 500 }
+    );
+  }
+}

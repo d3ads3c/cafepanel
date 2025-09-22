@@ -1,9 +1,18 @@
 "use client";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function MobileHead() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      router.replace('/login');
+    }
+  }
   return (
     <div
       className={`flex items-center justify-between p-5 fixed z-20 bg-white w-full top-0 border-b border-gray-200 ${
@@ -17,9 +26,9 @@ export default function MobileHead() {
         <h2 className="text-lg text-black">سلام نیما</h2>
       </div>
       <div className="flex items-center justify-end">
-        <div className="bg-white border border-teal-400 text-teal-400 size-12 rounded-2xl flex items-center justify-center">
+        <button onClick={handleLogout} className="bg-white border border-teal-400 text-teal-400 size-12 rounded-2xl flex items-center justify-center active:scale-95">
           <i className="fi fi-sr-power mt-1"></i>
-        </div>
+        </button>
       </div>
     </div>
   );

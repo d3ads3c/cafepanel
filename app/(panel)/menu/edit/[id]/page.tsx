@@ -22,6 +22,7 @@ export default function EditItem() {
   const itemId = params.id as string;
   
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [categories, setCategories] = useState<Array<{id: number, name: string}>>([]);
@@ -112,13 +113,7 @@ export default function EditItem() {
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setSelectedImage(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) readImageFile(file);
   };
 
   const handleButtonClick = () => {
@@ -127,9 +122,38 @@ export default function EditItem() {
 
   const handleRemoveImage = () => {
     setSelectedImage(null);
+    setImageError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  const readImageFile = (file: File) => {
+    setImageError(null);
+    if (!file.type.startsWith('image/')) {
+      setImageError('لطفاً یک تصویر معتبر انتخاب کنید');
+      return;
+    }
+    const maxBytes = 2 * 1024 * 1024; // 2MB
+    if (file.size > maxBytes) {
+      setImageError('حجم تصویر نباید بیش از 2 مگابایت باشد');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setSelectedImage(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) readImageFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -246,7 +270,7 @@ export default function EditItem() {
         </Link>
       </div>
       <form onSubmit={handleSubmit} className="mt-5 px-5 pt-5">
-        <div className="relative">
+        <div className="relative" onDrop={handleDrop} onDragOver={handleDragOver}>
           {selectedImage ? (
             <div className="relative">
               <img
@@ -293,6 +317,9 @@ export default function EditItem() {
             onChange={handleImageSelect}
             className="hidden"
           />
+          {imageError && (
+            <div className="text-center text-red-600 text-xs mt-2">{imageError}</div>
+          )}
         </div>
         <div className="space-y-7 mt-4">
           <div>

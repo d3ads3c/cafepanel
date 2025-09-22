@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { getAuth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export default function SettingPage() {
+  const auth = getAuth();
+  const canManageUsers = hasPermission(auth, 'manage_users');
   return (
     <div className="xl:mt-0 mt-20">
       <div className="h-[370px] w-full pt-14 bg-center bg-no-repeat bg-cover bg-[url('/img/HeadBG.png')] flex items-center justify-center">
@@ -73,19 +77,21 @@ export default function SettingPage() {
               <i className="fi fi-sr-angle-small-left"></i>
             </div>
           </Link>
-          <div className="flex items-center justify-between text-gray-700 font-light p-3 hover:bg-gray-50 transition-colors cursor-pointer">
-            <div className="flex items-center gap-3">
-              <div className="mt-1">
-                <i className="fi fi-rr-member-list text-xl"></i>
+          {canManageUsers && (
+            <Link href={"/settings/users"} className="flex items-center justify-between text-gray-700 font-light p-3 hover:bg-gray-50 transition-colors cursor-pointer">
+              <div className="flex items-center gap-3">
+                <div className="mt-1">
+                  <i className="fi fi-rr-member-list text-xl"></i>
+                </div>
+                <div>
+                  <p className="text-sm xl:text-base">کاربران</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm xl:text-base">کاربران</p>
+              <div className="text-left mt-1.5">
+                <i className="fi fi-sr-angle-small-left"></i>
               </div>
-            </div>
-            <div className="text-left mt-1.5">
-              <i className="fi fi-sr-angle-small-left"></i>
-            </div>
-          </div>
+            </Link>
+          )}
           <div className="w-[90%] h-[1px] bg-gray-100 mx-auto"></div>
           <div className="flex items-center justify-between text-gray-700 font-light p-3 hover:bg-gray-50 transition-colors cursor-pointer">
             <div className="flex items-center gap-3">

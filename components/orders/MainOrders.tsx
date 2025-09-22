@@ -577,12 +577,13 @@ export default function MainOrders() {
   
   const todayOrders = orders.filter(o => {
     if (!o.createdAt) return false;
+    if (o.status === 'cancelled') return false;
     const orderDate = new Date(o.createdAt);
     return orderDate >= todayStart && orderDate < todayEnd;
   });
 
   const orderStats = {
-    total: orders.length,
+    total: orders.filter(o => o.status !== "cancelled").length,
     pending: orders.filter(o => o.status === "pending").length,
     preparing: orders.filter(o => o.status === "preparing").length,
     ready: orders.filter(o => o.status === "ready").length,
@@ -1286,7 +1287,7 @@ export default function MainOrders() {
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => openOrderModal(order)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-2 mt-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="مشاهده جزئیات"
                           >
                             <i className="fi fi-rr-eye text-sm"></i>
@@ -1294,10 +1295,11 @@ export default function MainOrders() {
                           {order.status !== "completed" && order.status !== "cancelled" && (
                             <button
                               onClick={() => changeOrderStatus(order.id, order.status)}
-                              className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                              className="p-2 border border-teal-600 text-sm text-teal-600 hover:bg-teal-50 rounded-xl transition-colors"
                               title="تغییر وضعیت"
                             >
-                              <i className="fi fi-rr-check text-sm"></i>
+                              {order.status === "pending" || order.status === "preparing" ? "آماده شده" :
+                               order.status === "ready" ? "پرداخت شده" : "تغییر"}
                             </button>
                           )}
                         </div>
@@ -1926,6 +1928,14 @@ export default function MainOrders() {
                   >
                     بستن
                   </button>
+                  {selectedOrder.status !== "completed" && selectedOrder.status !== "cancelled" && (
+                    <button
+                      onClick={cancelOrder}
+                      className="px-6 py-3 border border-red-300 text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                    >
+                      لغو سفارش
+                    </button>
+                  )}
                   {selectedOrder.status !== "completed" && selectedOrder.status !== "cancelled" && (
                     <button
                       onClick={() => changeOrderStatus(selectedOrder.id, selectedOrder.status)}

@@ -1,8 +1,17 @@
 "use client";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function DesktopHeader() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      router.replace('/login');
+    }
+  }
 
   const getPageTitle = () => {
     switch (pathname) {
@@ -42,29 +51,26 @@ export default function DesktopHeader() {
       
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+        {/* <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
           <i className="fi fi-rr-bell text-xl"></i>
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-        </button>
+        </button> */}
 
         {/* Search */}
-        <div className="relative">
+        {/* <div className="relative">
           <input
             type="text"
             placeholder="جستجو..."
             className="w-64 px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
           <i className="fi fi-rr-search absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-        </div>
+        </div> */}
 
         {/* User Menu */}
         <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-sm font-medium text-gray-800">عصر بخیر</p>
-            <p className="text-xs text-gray-500">سلام نیما</p>
-          </div>
-          <button className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center hover:bg-teal-200 transition-colors">
-            <i className="fi fi-sr-user text-teal-600"></i>
+          <button onClick={handleLogout} className="inline-flex items-center gap-2 px-3 py-1 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors">
+            <i className="fi fi-sr-power mt-1.5 text-red-500"></i>
+            <span className="text-sm">خروج</span>
           </button>
         </div>
       </div>

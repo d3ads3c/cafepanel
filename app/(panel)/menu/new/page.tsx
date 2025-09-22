@@ -6,6 +6,7 @@ import CustomSelect from "@/components/ui/Select";
 
 export default function NewItem() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -27,6 +28,34 @@ export default function NewItem() {
       return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
     return '';
+  };
+
+  const readImageFile = (file: File) => {
+    setImageError(null);
+    if (!file.type.startsWith('image/')) {
+      setImageError('لطفاً یک تصویر معتبر انتخاب کنید');
+      return;
+    }
+    const maxBytes = 2 * 1024 * 1024; // 2MB
+    if (file.size > maxBytes) {
+      setImageError('حجم تصویر نباید بیش از 2 مگابایت باشد');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setSelectedImage(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) readImageFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
   };
 
   // Utility function to remove commas and convert to number
@@ -59,13 +88,7 @@ export default function NewItem() {
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setSelectedImage(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) readImageFile(file);
   };
 
   const handleButtonClick = () => {
@@ -74,6 +97,7 @@ export default function NewItem() {
 
   const handleRemoveImage = () => {
     setSelectedImage(null);
+    setImageError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -140,6 +164,8 @@ export default function NewItem() {
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
+        // Navigate back to menu list
+        window.location.href = '/menu';
       } else {
         const errorData = await response.json();
         toast.error(`خطا در ثبت آیتم: ${errorData.message || 'خطای نامشخص'}`);
@@ -164,7 +190,7 @@ export default function NewItem() {
         </Link>
       </div>
       <form onSubmit={handleSubmit} className="mt-5 px-5 pt-5">
-        <div className="relative">
+        <div className="relative" onDrop={handleDrop} onDragOver={handleDragOver}>
           {selectedImage ? (
             <div className="relative">
               <img
@@ -201,7 +227,7 @@ export default function NewItem() {
                   d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
               </svg>
-              <span className="text-sm">انتخاب تصویر محصول</span>
+              <span className="text-sm">انتخاب یا رها کردن تصویر اینجا</span>
             </button>
           )}
           <input
@@ -211,6 +237,9 @@ export default function NewItem() {
             onChange={handleImageSelect}
             className="hidden"
           />
+          {imageError && (
+            <div className="text-center text-red-600 text-xs mt-2">{imageError}</div>
+          )}
         </div>
         <div className="space-y-7 mt-4">
           <div>

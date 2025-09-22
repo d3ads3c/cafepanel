@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 
 interface MenuItem {
   id: number;
@@ -20,6 +21,8 @@ export default function MenuItems() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   // Format price with commas
   const formatPrice = (price: number) => {
@@ -51,14 +54,41 @@ export default function MenuItems() {
   // Load data on component mount
   useEffect(() => {
     fetchMenuItems();
+    // Load categories for filter
+    (async () => {
+      try {
+        const res = await fetch('/api/categories');
+        const data = await res.json();
+        if (data.success) {
+          setCategories(data.data);
+        }
+      } catch (e) {}
+    })();
   }, []);
 
-  // Filter menu items based on search term
-  const filteredItems = menuItems.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.info.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter menu items based on search term and category
+  const filteredItems = menuItems.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.info.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategoryId === null || item.categoryId === selectedCategoryId;
+    return matchesSearch && matchesCategory;
+  });
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('آیا از حذف این آیتم مطمئن هستید؟')) return;
+    try {
+      const res = await fetch(`/api/menu/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success('آیتم حذف شد');
+        fetchMenuItems();
+      } else {
+        toast.error(data.message || 'خطا در حذف آیتم');
+      }
+    } catch (e) {
+      toast.error('خطا در ارتباط با سرور');
+    }
+  };
 
   return (
     <div className="xl:mt-0 mt-20">
@@ -73,7 +103,8 @@ export default function MenuItems() {
       </div>
 
       <div className="xl:px-0 px-5 pt-5">
-        <div className="flex items-center bg-gray-100 rounded-xl w-full px-4">
+        <div className="flex flex-col xl:flex-row gap-3 xl:items-center xl:justify-between">
+          <div className="flex items-center bg-gray-100 rounded-xl w-full px-4">
           <i className="fi fi-br-search text-gray-400 mt-1.5"></i>
           <input
             type="text"
@@ -82,6 +113,19 @@ export default function MenuItems() {
             className="w-[95%] p-3.5 text-sm xl:text-base bg-transparent focus:outline-none"
             placeholder="جستوجو"
           />
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedCategoryId ?? ''}
+              onChange={(e) => setSelectedCategoryId(e.target.value === '' ? null : Number(e.target.value))}
+              className="p-3.5 text-sm xl:text-base bg-white border rounded-xl"
+            >
+              <option value="">همه دسته‌ها</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -144,14 +188,20 @@ export default function MenuItems() {
                     <h3 className="mt-3 text-sm xl:text-base font-medium">{formatPrice(item.price)} تومان</h3>
                   </div>
                 </div>
-                <div className="mt-4">
-                  <Link
-                    href={`/menu/edit/${item.id}`}
-                    className="block text-white bg-teal-400 py-3 rounded-2xl w-full text-center hover:bg-teal-500 transition-colors"
-                  >
-                    ویرایش
-                  </Link>
-                </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link
+                  href={`/menu/edit/${item.id}`}
+                  className="text-center text-white bg-teal-400 py-3 rounded-2xl hover:bg-teal-500 transition-colors"
+                >
+                  ویرایش
+                </Link>
+                <button
+                  onClick={() => handleDelete(item.id)}
+                  className="text-center text-red-600 border border-red-200 hover:bg-red-50 py-3 rounded-2xl transition-colors"
+                >
+                  حذف
+                </button>
+              </div>
               </div>
             ))}
           </div>

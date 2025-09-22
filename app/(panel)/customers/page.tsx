@@ -14,6 +14,8 @@ interface Customer {
   total_spent: number;
   created_at: string;
   last_order_date?: string;
+  unpaid_count?: number;
+  unpaid_total?: number;
 }
 
 export default function CustomersPage() {
@@ -31,6 +33,10 @@ export default function CustomersPage() {
     address: "",
     notes: "",
   });
+  const [unpaidModalOpen, setUnpaidModalOpen] = useState(false);
+  const [unpaidLoading, setUnpaidLoading] = useState(false);
+  const [unpaidCustomerName, setUnpaidCustomerName] = useState<string>("");
+  const [unpaidOrders, setUnpaidOrders] = useState<Array<{ id: number; createdAt: string; items: Array<{ item_name: string; quantity: number; item_price: number | string; }> }>>([]);
 
   useEffect(() => {
     fetchCustomers();
@@ -146,12 +152,113 @@ export default function CustomersPage() {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const formatPrice = (price: number) => {
-    return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const formatPrice = (price: number | string) => {
+    const numPrice = typeof price === "string" ? parseFloat(price) : price;
+    const rounded = Math.round(Number.isNaN(numPrice) ? 0 : numPrice);
+    return rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fa-IR');
+  };
+
+  const handlePrintUnpaid = () => {
+    const unpaidCustomers = customers.filter(c => (c.unpaid_total || 0) > 0 || (c.unpaid_count || 0) > 0);
+    const totalUnpaidSum = unpaidCustomers.reduce((sum, c) => sum + (c.unpaid_total || 0), 0);
+    const totalUnpaidCount = unpaidCustomers.reduce((sum, c) => sum + (c.unpaid_count || 0), 0);
+
+    const printWindow = window.open('', '_blank', 'width=800,height=600');
+    if (!printWindow) return;
+
+    const rowsHtml = unpaidCustomers.map(c => `
+      <tr>
+        <td class="name">${c.name}</td>
+        <td class="count">${c.unpaid_count || 0}</td>
+        <td class="amount">${formatPrice(c.unpaid_total || 0)} تومان</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>گزارش بدهکارها</title>
+          <style>
+            @media print {
+              @page { margin: 0; width: 80mm; }
+              body { margin: 0; width: 74mm; }
+            }
+            body { font-family: Tahoma, Arial, sans-serif; direction: rtl; color: #000; background: #fff; padding: 8px; }
+            .header { text-align: center; margin-bottom: 8px; }
+            .title { font-weight: 700; font-size: 14px; }
+            .sub { font-size: 11px; color: #000; }
+            .divider { border-bottom: 1px dashed #000; margin: 8px 0; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { padding: 6px 4px; font-size: 11px; text-align: right; border-bottom: 1px solid #000; }
+            th { font-weight: 700; }
+            tr:last-child td { border-bottom: none; }
+            .name { width: 50%; word-break: break-word; }
+            .count { width: 20%; text-align: center; }
+            .amount { width: 30%; text-align: left; }
+            .totals { margin-top: 8px; font-weight: 700; font-size: 12px; display: flex; justify-content: space-between; }
+            .footer { text-align: center; margin-top: 8px; font-size: 10px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">گزارش مشتریان بدهکار</div>
+            <div class="sub">${new Date().toLocaleString('fa-IR')}</div>
+          </div>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <th>نام مشتری</th>
+                <th>تعداد بدهی</th>
+                <th>مبلغ بدهی</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || '<tr><td colspan="3" style="text-align:center">هیچ بدهی ثبت نشده است</td></tr>'}
+            </tbody>
+          </table>
+          <div class="totals">
+            <span>مجموع بدهی‌ها: ${formatPrice(totalUnpaidSum)} تومان</span>
+            <span>کل سفارشات بدهکار: ${totalUnpaidCount}</span>
+          </div>
+          <div class="divider"></div>
+          <div class="footer">چاپ از پنل مشتریان</div>
+          <script>
+            window.onload = function() { window.print(); setTimeout(() => window.close(), 500); };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const openUnpaidItemsModal = async (customerName: string) => {
+    setUnpaidCustomerName(customerName);
+    setUnpaidLoading(true);
+    setUnpaidModalOpen(true);
+    try {
+      const res = await fetch('/api/orders');
+      const data = await res.json();
+      if (data.success) {
+        const orders = (data.data as any[])
+          .filter(o => (o.customerName || '') === customerName)
+          .filter(o => (!o.paymentMethod || o.paymentMethod === '') && o.status !== 'cancelled');
+        setUnpaidOrders(orders.map(o => ({ id: o.id, createdAt: o.createdAt, items: o.items || [] })));
+      } else {
+        toast.error('خطا در دریافت سفارشات بدهکار');
+      }
+    } catch (e) {
+      toast.error('خطا در ارتباط با سرور');
+    } finally {
+      setUnpaidLoading(false);
+    }
   };
 
   return (
@@ -163,13 +270,23 @@ export default function CustomersPage() {
             <h1 className="text-2xl xl:text-3xl font-bold text-gray-800">مدیریت مشتریان</h1>
             <p className="text-gray-600 mt-1">مدیریت اطلاعات مشتریان و تاریخچه سفارشات</p>
           </div>
-          <button
-            onClick={() => setDialogOpen(true)}
-            className="bg-teal-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-teal-600 transition-colors flex items-center gap-2"
-          >
-            <i className="fi fi-rr-plus"></i>
-            مشتری جدید
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrintUnpaid}
+              className="px-4 py-3 border border-gray-300 rounded-xl text-gray-800 hover:bg-gray-50 transition-colors flex items-center gap-2"
+              title="چاپ بدهکارها"
+            >
+              <i className="fi fi-rr-print"></i>
+              چاپ بدهکارها
+            </button>
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="bg-teal-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-teal-600 transition-colors flex items-center gap-2"
+            >
+              <i className="fi fi-rr-plus"></i>
+              مشتری جدید
+            </button>
+          </div>
         </div>
 
         {/* Search and Stats */}
@@ -219,6 +336,7 @@ export default function CustomersPage() {
                     <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">تماس</th>
                     <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">سفارشات</th>
                     <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">مجموع خرید</th>
+                    <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">بدهکار</th>
                     <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">آخرین سفارش</th>
                     <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">عملیات</th>
                   </tr>
@@ -246,15 +364,30 @@ export default function CustomersPage() {
                         )}
                       </td>
                       <td className="py-4 px-6">
-                        <div className="text-center">
+                        <div className="text-right">
                           <p className="font-medium text-gray-800">{customer.total_orders}</p>
                           <p className="text-xs text-gray-500">سفارش</p>
                         </div>
                       </td>
                       <td className="py-4 px-6">
-                        <div className="text-left">
+                        <div className="text-right">
                           <p className="font-medium text-gray-800">{formatPrice(customer.total_spent)}</p>
                           <p className="text-xs text-gray-500">تومان</p>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="text-right">
+                          <p className={`font-medium ${customer.unpaid_total && customer.unpaid_total > 0 ? 'text-red-600' : 'text-gray-800'}`}>
+                            {formatPrice(customer.unpaid_total || 0)}
+                          </p>
+                          <button
+                            disabled={!(customer.unpaid_count && customer.unpaid_count > 0)}
+                            onClick={() => openUnpaidItemsModal(customer.name)}
+                            className={`text-xs ${customer.unpaid_count && customer.unpaid_count > 0 ? 'text-teal-600 hover:underline' : 'text-gray-500'} disabled:text-gray-400`}
+                            title={customer.unpaid_count && customer.unpaid_count > 0 ? 'نمایش آیتم‌های بدهکار' : ''}
+                          >
+                            {(customer.unpaid_count || 0)} سفارش
+                          </button>
                         </div>
                       </td>
                       <td className="py-4 px-6">
@@ -455,6 +588,59 @@ export default function CustomersPage() {
       )}
 
       <Toaster position="top-center" />
+      {unpaidModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">سفارشات بدهکار - {unpaidCustomerName}</h3>
+                <p className="text-sm text-gray-500">نمایش آیتم‌های سفارش‌های بدون پرداخت</p>
+              </div>
+              <button onClick={() => setUnpaidModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <i className="fi fi-rr-cross text-xl"></i>
+              </button>
+            </div>
+            <div className="p-6">
+              {unpaidLoading ? (
+                <div className="text-center text-gray-500 py-8">در حال بارگذاری...</div>
+              ) : unpaidOrders.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">سفارشی یافت نشد</div>
+              ) : (
+                <div className="space-y-4">
+                  {unpaidOrders.map(order => (
+                    <div key={order.id} className="border border-gray-200 rounded-xl">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <div className="font-bold text-gray-800">سفارش #{order.id}</div>
+                        <div className="text-sm text-gray-600">{new Date(order.createdAt).toLocaleString('fa-IR')}</div>
+                      </div>
+                      <div className="p-4">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="text-gray-600 text-sm">
+                              <th className="text-right py-2">نام کالا</th>
+                              <th className="text-center py-2">تعداد</th>
+                              <th className="text-left py-2">قیمت</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-sm">
+                            {order.items.map((it, idx) => (
+                              <tr key={idx} className="border-t border-gray-100">
+                                <td className="py-2 pr-1 text-gray-800">{it.item_name}</td>
+                                <td className="py-2 text-center text-gray-800">{it.quantity}</td>
+                                <td className="py-2 pl-1 text-left text-gray-800">{formatPrice(it.item_price)} تومان</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

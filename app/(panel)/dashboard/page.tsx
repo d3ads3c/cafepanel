@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from 'next/navigation'
 import dynamic from "next/dynamic";
 import { Toaster } from "react-hot-toast";
 import toast from "react-hot-toast";
@@ -39,6 +40,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [dashboardData, setDashboardData] = useState<DashboardStats>({
     todayRevenue: 0,
     todayOrders: 0,
@@ -50,45 +52,64 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [canView, setCanView] = useState<boolean | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    fetchDashboardData();
+    const check = async () => {
+      const res = await fetch('/api/auth/me')
+      const data = await res.json()
+      const perms: string[] = data?.data?.permissions || []
+      const allowed = Array.isArray(perms) && perms.includes('view_dashboard')
+      setCanView(allowed)
+      if (allowed) {
+        fetchDashboardData();
+      } else {
+        setLoading(false)
+      }
+    }
+    check()
   }, []);
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
 
   // Force refresh on component mount
   useEffect(() => {
+    if (!canView) return;
     const timer = setTimeout(() => {
       fetchDashboardData();
-    }, 1000); // Refresh after 1 second
-
+    }, 1000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [canView]);
 
   // Refresh data every 30 seconds
   useEffect(() => {
+    if (!canView) return;
     const interval = setInterval(() => {
       fetchDashboardData();
       setLastRefresh(new Date());
-    }, 30000); // 30 seconds
-
+    }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [canView]);
 
   // Refresh data when page becomes visible
   useEffect(() => {
+    if (!canView) return;
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         fetchDashboardData();
         setLastRefresh(new Date());
       }
     };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  }, [canView]);
 
   const fetchDashboardData = async () => {
     try {
+      if (!canView) return;
       setLoading(true);
       
       // Fetch all data in parallel
@@ -251,6 +272,8 @@ export default function DashboardPage() {
       setLoading(false);
     }
   };
+
+  // No early return to keep hooks order stable
 
   const getOrderStatusText = (status: string) => {
     const statusMap: { [key: string]: string } = {
@@ -459,6 +482,11 @@ export default function DashboardPage() {
   return (
     <div className="xl:mt-0 mt-20">
       <div className="xl:px-0 px-7 py-5 space-y-6">
+        {canView === false && (
+          <div className="bg-white rounded-2xl p-4 xl:p-6 shadow-box text-gray-600">
+            شما دسترسی مشاهده داشبورد را ندارید.
+          </div>
+        )}
         {/* Welcome Section */}
         <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-3xl p-6 text-white">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
@@ -466,7 +494,11 @@ export default function DashboardPage() {
               <h1 className="text-2xl xl:text-3xl font-bold mb-2">عصر بخیر، نیما! 👋</h1>
               <p className="text-teal-100 text-sm xl:text-base">امروز چطور می‌توانیم به شما کمک کنیم؟</p>
               <p className="text-teal-200 text-xs mt-2">
-                آخرین به‌روزرسانی: {lastRefresh.toLocaleTimeString('fa-IR')}
+                {hasMounted ? (
+                  <>آخرین به‌روزرسانی: {lastRefresh.toLocaleTimeString('fa-IR')}</>
+                ) : (
+                  <>آخرین به‌روزرسانی: --:--:--</>
+                )}
               </p>
             </div>
             <div className="mt-4 xl:mt-0 flex items-center gap-4">
@@ -483,11 +515,11 @@ export default function DashboardPage() {
               <div className="text-right">
                 <p className="text-teal-100 text-sm">امروز</p>
                 <p className="text-2xl xl:text-3xl font-bold">
-                  {new Date().toLocaleDateString('fa-IR', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
+                  {hasMounted ? (
+                    new Date().toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' })
+                  ) : (
+                    '—'
+                  )}
                 </p>
               </div>
             </div>
@@ -500,7 +532,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-xs xl:text-sm">درآمد امروز</p>
-                <p className="text-lg xl:text-2xl font-bold text-gray-800 mt-1">
+                <div className="text-lg xl:text-2xl font-bold text-gray-800 mt-1">
                   {loading ? (
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
@@ -509,7 +541,7 @@ export default function DashboardPage() {
                   ) : (
                     formatPrice(dashboardData.todayRevenue)
                   )}
-                </p>
+                </div>
                 <p className="text-xs text-teal-500 mt-1">
                   تومان • {dashboardData.todayOrders} سفارش
                 </p>

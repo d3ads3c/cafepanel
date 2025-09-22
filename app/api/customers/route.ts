@@ -11,9 +11,24 @@ export async function GET() {
         c.*,
         COUNT(o.order_ID) as total_orders,
         COALESCE(SUM(o.total_price), 0) as total_spent,
-        MAX(o.created_at) as last_order_date
+        MAX(o.created_at) as last_order_date,
+        COALESCE(u.unpaid_count, 0) AS unpaid_count,
+        COALESCE(u.unpaid_total, 0) AS unpaid_total
       FROM customers c
-      LEFT JOIN orders o ON c.name = o.customer_name
+      LEFT JOIN orders o 
+        ON c.name = o.customer_name
+       AND o.order_status <> 'cancelled'
+      LEFT JOIN (
+        SELECT 
+          customer_name,
+          COUNT(*) AS unpaid_count,
+          COALESCE(SUM(total_price), 0) AS unpaid_total
+        FROM orders
+        WHERE (payment_method IS NULL OR payment_method = '')
+          AND order_status <> 'cancelled'
+          AND customer_name IS NOT NULL AND customer_name <> ''
+        GROUP BY customer_name
+      ) u ON c.name = u.customer_name
       GROUP BY c.id
       ORDER BY c.created_at DESC
     `;
