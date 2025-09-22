@@ -23,7 +23,7 @@ export default function MobileHead() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } finally {
-      router.replace('/login');
+      router.replace('/');
     }
   }
   return (

@@ -34,8 +34,17 @@ export async function POST(request: NextRequest) {
       : (() => { try { return JSON.parse(user.permissions || '[]') } catch { return [] } })()
 
     const token = signPayload({ userId: user.id, username: user.username, permissions })
-    setAuthCookie(token)
-    return NextResponse.json({ success: true })
+    const response = NextResponse.json({ success: true })
+    response.cookies.set({
+      name: 'auth_token',
+      value: token,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    })
+    return response
   } catch (e) {
     return NextResponse.json({ success: false, message: 'login failed' }, { status: 500 })
   } finally {
