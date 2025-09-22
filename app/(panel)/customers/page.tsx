@@ -10,6 +10,8 @@ interface Customer {
   email?: string;
   address?: string;
   notes?: string;
+  discount_type?: 'percent' | 'amount' | null;
+  discount_value?: number | null;
   total_orders: number;
   total_spent: number;
   created_at: string;
@@ -32,6 +34,8 @@ export default function CustomersPage() {
     email: "",
     address: "",
     notes: "",
+    discount_type: '' as '' | 'percent' | 'amount',
+    discount_value: '' as string | number,
   });
   const [unpaidModalOpen, setUnpaidModalOpen] = useState(false);
   const [unpaidLoading, setUnpaidLoading] = useState(false);
@@ -84,7 +88,7 @@ export default function CustomersPage() {
         toast.success(editingCustomer ? "مشتری با موفقیت ویرایش شد" : "مشتری جدید با موفقیت اضافه شد");
         setDialogOpen(false);
         setEditingCustomer(null);
-        setForm({ name: "", phone: "", email: "", address: "", notes: "" });
+        setForm({ name: "", phone: "", email: "", address: "", notes: "", discount_type: '', discount_value: '' });
         fetchCustomers();
       } else {
         toast.error(result.message || "خطا در ذخیره اطلاعات");
@@ -103,6 +107,8 @@ export default function CustomersPage() {
       email: customer.email || "",
       address: customer.address || "",
       notes: customer.notes || "",
+      discount_type: (customer.discount_type as any) || '',
+      discount_value: customer.discount_value || '',
     });
     setDialogOpen(true);
   };
@@ -129,7 +135,7 @@ export default function CustomersPage() {
   };
 
   const resetForm = () => {
-    setForm({ name: "", phone: "", email: "", address: "", notes: "" });
+    setForm({ name: "", phone: "", email: "", address: "", notes: "", discount_type: '', discount_value: '' });
     setEditingCustomer(null);
     setDialogOpen(false);
   };
@@ -564,6 +570,38 @@ export default function CustomersPage() {
                     onChange={(e) => setForm({ ...form, notes: e.target.value })}
                     placeholder="یادداشت‌های اضافی..."
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    تخفیف پیش‌فرض مشتری (اختیاری)
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <select
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      value={form.discount_type}
+                      onChange={(e) => setForm({ ...form, discount_type: e.target.value as any })}
+                    >
+                      <option value="">بدون تخفیف</option>
+                      <option value="percent">درصد (%)</option>
+                      <option value="amount">مبلغ (تومان)</option>
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      value={form.discount_value as any}
+                      onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
+                      placeholder={form.discount_type === 'percent' ? 'مثال: 10 برای 10%' : 'مثال: 5000 برای ۵,۰۰۰ تومان'}
+                      disabled={!form.discount_type}
+                    />
+                    <div className="flex items-center text-sm text-gray-500">
+                      {form.discount_type === 'percent' && 'بر روی مجموع سفارش اعمال می‌شود'}
+                      {form.discount_type === 'amount' && 'از مجموع سفارش کسر می‌شود'}
+                      {!form.discount_type && 'بدون اعمال تخفیف خودکار'}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-4">

@@ -45,14 +45,14 @@ export async function GET(
 
     const item = (rows as any[])[0];
     const menuItem = {
-      id: item.menu_ID,
-      name: item.menu_name,
-      info: item.menu_info,
-      price: item.menu_price,
-      image: item.menu_img,
-      categoryId: item.menu_category,
-      categoryName: item.category_name,
-      status: item.menu_status
+      id: Number(item.menu_ID),
+      name: item.menu_name ?? '',
+      info: item.menu_info ?? '',
+      price: Number(item.menu_price),
+      image: item.menu_img ?? null,
+      categoryId: item.menu_category === null || item.menu_category === undefined ? null : Number(item.menu_category),
+      categoryName: item.category_name ?? null,
+      status: Number(item.menu_status)
     };
 
     return NextResponse.json({

@@ -68,8 +68,10 @@ export default function MenuItems() {
 
   // Filter menu items based on search term and category
   const filteredItems = menuItems.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.info.toLowerCase().includes(searchTerm.toLowerCase());
+    const safeName = (item.name || '').toLowerCase();
+    const safeInfo = (item.info || '').toLowerCase();
+    const query = (searchTerm || '').toLowerCase();
+    const matchesSearch = safeName.includes(query) || safeInfo.includes(query);
     const matchesCategory = selectedCategoryId === null || item.categoryId === selectedCategoryId;
     return matchesSearch && matchesCategory;
   });

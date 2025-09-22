@@ -8,7 +8,8 @@ export async function GET() {
     
     const selectQuery = `
       SELECT 
-        c.*,
+        c.id, c.name, c.phone, c.email, c.address, c.notes, c.created_at, c.updated_at,
+        c.discount_type, c.discount_value,
         COUNT(o.order_ID) as total_orders,
         COALESCE(SUM(o.total_price), 0) as total_spent,
         MAX(o.created_at) as last_order_date,
@@ -56,7 +57,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   let connection;
   try {
-    const { name, phone, email, address, notes } = await request.json();
+    const { name, phone, email, address, notes, discount_type, discount_value } = await request.json();
 
     if (!name || !phone) {
       return NextResponse.json(
@@ -82,9 +83,9 @@ export async function POST(request: NextRequest) {
     }
 
     const [result] = await connection.execute(
-      `INSERT INTO customers (name, phone, email, address, notes, created_at) 
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [name, phone, email || null, address || null, notes || null]
+      `INSERT INTO customers (name, phone, email, address, notes, discount_type, discount_value, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [name, phone, email || null, address || null, notes || null, discount_type || null, discount_value ?? null]
     );
 
     connection.release();

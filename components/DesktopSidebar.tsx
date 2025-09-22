@@ -1,11 +1,23 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function DesktopSidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [displayName, setDisplayName] = useState<string>('کاربر');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        const name = data?.data?.username || 'کاربر';
+        setDisplayName(name);
+      } catch {}
+    })();
+  }, []);
 
   const navigationItems = [
     {
@@ -99,7 +111,7 @@ export default function DesktopSidebar() {
           </div>
           {!isCollapsed && (
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">نیما</p>
+              <p className="text-sm font-medium text-gray-800">{displayName}</p>
               <p className="text-xs text-gray-500">مدیر سیستم</p>
             </div>
           )}

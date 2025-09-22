@@ -1,10 +1,23 @@
 "use client";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function MobileHead() {
   const pathname = usePathname();
   const router = useRouter();
+  const [displayName, setDisplayName] = useState<string>('کاربر');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        const name = data?.data?.username || 'کاربر';
+        setDisplayName(name);
+      } catch {}
+    })();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -23,7 +36,7 @@ export default function MobileHead() {
     >
       <div className="w-2/3">
         <p className="text-xs text-gray-400">عصر بخیر</p>
-        <h2 className="text-lg text-black">سلام نیما</h2>
+        <h2 className="text-lg text-black">سلام {displayName}</h2>
       </div>
       <div className="flex items-center justify-end">
         <button onClick={handleLogout} className="bg-white border border-teal-400 text-teal-400 size-12 rounded-2xl flex items-center justify-center active:scale-95">

@@ -10,7 +10,8 @@ export async function GET(
     
     const selectQuery = `
       SELECT 
-        c.*,
+        c.id, c.name, c.phone, c.email, c.address, c.notes, c.created_at, c.updated_at,
+        c.discount_type, c.discount_value,
         COUNT(o.order_ID) as total_orders,
         COALESCE(SUM(o.total_price), 0) as total_spent,
         MAX(o.created_at) as last_order_date
@@ -48,7 +49,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { name, phone, email, address, notes } = await request.json();
+    const { name, phone, email, address, notes, discount_type, discount_value } = await request.json();
 
     if (!name || !phone) {
       return NextResponse.json(
@@ -89,9 +90,9 @@ export async function PUT(
 
     await connection.execute(
       `UPDATE customers 
-       SET name = ?, phone = ?, email = ?, address = ?, notes = ?, updated_at = NOW()
+       SET name = ?, phone = ?, email = ?, address = ?, notes = ?, discount_type = ?, discount_value = ?, updated_at = NOW()
        WHERE id = ?`,
-      [name, phone, email || null, address || null, notes || null, params.id]
+      [name, phone, email || null, address || null, notes || null, discount_type || null, discount_value ?? null, params.id]
     );
 
     connection.release();

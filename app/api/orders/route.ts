@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
       `;
       
       const totalItems = body.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
-      const totalPrice = body.items.reduce((sum: number, item: any) => sum + (parseFloat(item.price) * item.quantity), 0);
+      const computedTotalPrice = body.items.reduce((sum: number, item: any) => sum + (parseFloat(item.price) * item.quantity), 0);
+      const totalPrice = typeof body.totalPrice === 'number' ? body.totalPrice : computedTotalPrice;
       
       const orderValues = [
         body.customerName || null,

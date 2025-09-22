@@ -5,7 +5,7 @@ import CustomSelect from "../ui/Select";
 
 export default function BoxLists() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const Managers = ["نیما نیک عمل", "حسین بهرامی", "حسین بهرامی", "حسین بهرامی", "حسین بهرامی"];
+  const Managers = ["کاربر ۱", "کاربر ۲", "کاربر ۳", "کاربر ۴", "کاربر ۵"];
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   const handleSelect = (value: string) => {

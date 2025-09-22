@@ -17,6 +17,8 @@ export default function MainOrders() {
   );
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [customerName, setCustomerName] = useState<string>("");
+  const [customerDiscount, setCustomerDiscount] = useState<{type: 'percent'|'amount'|''; value: number}|null>(null);
+  const [applyCustomerDiscount, setApplyCustomerDiscount] = useState<boolean>(true);
   const [tableNumber, setTableNumber] = useState<string>("");
   const [orderItems, setOrderItems] = useState<
     Array<{
@@ -77,6 +79,8 @@ export default function MainOrders() {
     name: string;
     phone: string;
     email: string;
+    discount_type?: 'percent' | 'amount' | null;
+    discount_value?: number | null;
   }>>([]);
   const [isTableModalOpen, setIsTableModalOpen] = useState<boolean>(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState<boolean>(false);
@@ -512,15 +516,28 @@ export default function MainOrders() {
       return;
     }
 
+    const rawTotal = orderItems.reduce(
+      (sum, item) => sum + parseInt(item.price) * item.quantity,
+      0
+    );
+    let discountAmount = 0;
+    if (applyCustomerDiscount && customerDiscount && customerDiscount.value > 0) {
+      if (customerDiscount.type === 'percent') {
+        discountAmount = Math.floor((rawTotal * customerDiscount.value) / 100);
+      } else if (customerDiscount.type === 'amount') {
+        discountAmount = Math.min(rawTotal, Math.floor(customerDiscount.value));
+      }
+    }
+    const finalTotal = Math.max(0, rawTotal - discountAmount);
+
     const orderData = {
       customerName,
       tableNumber,
       items: orderItems,
       totalItems: orderItems.reduce((sum, item) => sum + item.quantity, 0),
-      totalPrice: orderItems.reduce(
-        (sum, item) => sum + parseInt(item.price) * item.quantity,
-        0
-      ),
+      totalPrice: finalTotal,
+      discount: discountAmount,
+      discountType: customerDiscount?.type || '',
     };
 
     try {
@@ -538,6 +555,8 @@ export default function MainOrders() {
         toast.success("سفارش با موفقیت ثبت شد");
         // Clear the form
         setCustomerName("");
+        setCustomerDiscount(null);
+        setApplyCustomerDiscount(true);
         setTableNumber("");
         setOrderItems([]);
         setItemQuantities({});
@@ -569,6 +588,16 @@ export default function MainOrders() {
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 20;
+
+  // Totals for new order (with optional customer discount)
+  const rawOrderTotal = orderItems.reduce((sum, item) => sum + parseInt(item.price) * item.quantity, 0);
+  const computedDiscountAmount = (() => {
+    if (!applyCustomerDiscount || !customerDiscount || !customerDiscount.value) return 0;
+    if (customerDiscount.type === 'percent') return Math.floor((rawOrderTotal * customerDiscount.value) / 100);
+    if (customerDiscount.type === 'amount') return Math.min(rawOrderTotal, Math.floor(customerDiscount.value));
+    return 0;
+  })();
+  const finalOrderTotal = Math.max(0, rawOrderTotal - computedDiscountAmount);
 
   // Calculate order statistics using the same logic as dashboard
   const today = new Date();
@@ -730,10 +759,62 @@ export default function MainOrders() {
                 width: 80mm;
               }
               body {
-                width: 74mm;
                 margin: 0;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+              }
+              /* Force black & white for print */
+              * {
+                color: #000 !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
+              }
+              .receipt {
+                width: 74mm;
+                margin: 0 auto;
+              }
+              body, .header, .total-section, table, th, td, .status, .order-notes, .logo {
+                background: #fff !important;
+              }
+              .divider {
+                border-bottom-color: #000 !important;
+                border-bottom-width: 1.2px !important;
+              }
+              table {
+                border-top: 2px solid #000 !important;
+                border-bottom: 2px solid #000 !important;
+              }
+              th {
+                border-bottom: 1px solid #000 !important;
+                background: #fff !important;
+                font-weight: 700 !important;
+              }
+              td {
+                border-top: 1px dashed #000 !important;
+              }
+              .double-top {
+                border-top: 3px double #000 !important;
+              }
+              .section-title {
+                border-bottom: 1.5px solid #000 !important;
+                padding-bottom: 2mm !important;
+              }
+              .total-section {
+                border: 1.5px solid #000 !important;
+                border-radius: 1.5mm !important;
+              }
+              .total-row {
+                font-size: 13px !important;
+                font-weight: 800 !important;
+              }
+              .status {
+                border: 1px solid #000 !important;
+                background: #fff !important;
+              }
+              .barcode {
+                border: 1px dashed #000 !important;
+                padding: 2mm !important;
+                border-radius: 1mm !important;
               }
             }
             body {
@@ -745,6 +826,7 @@ export default function MainOrders() {
               line-height: 1.5;
               background: #f6f6f6;
             }
+            .receipt { width: 74mm; margin: 0 auto; }
             .header {
               text-align: center;
               margin-bottom: 3mm;
@@ -798,6 +880,11 @@ export default function MainOrders() {
               color: #008080;
               border-bottom: 1px solid #b2dfdb;
             }
+            .col-name { width: 42%; }
+            .col-qty { width: 12%; text-align: center; }
+            .col-unit { width: 22%; text-align: left; }
+            .col-total { width: 24%; text-align: left; }
+            .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
             .item-name {
               max-width: 30mm;
               overflow-wrap: break-word;
@@ -889,6 +976,7 @@ export default function MainOrders() {
           </style>
         </head>
         <body>
+          <div class="receipt">
           <div class="header">
             <div class="logo">کافه اِی</div>
             <div class="order-id">سفارش #${selectedOrder.id}</div>
@@ -925,10 +1013,10 @@ export default function MainOrders() {
           <table>
             <thead>
               <tr>
-                <th class="item-name">نام کالا</th>
-                <th class="quantity">تعداد</th>
-                <th class="price">فی</th>
-                <th class="price">قیمت</th>
+                <th class="item-name col-name">نام کالا</th>
+                <th class="quantity col-qty">تعداد</th>
+                <th class="price col-unit">فی</th>
+                <th class="price col-total">جمع</th>
               </tr>
             </thead>
             <tbody>
@@ -939,9 +1027,9 @@ export default function MainOrders() {
                     ${item.note ? `<div class='item-note'>یادداشت: ${item.note}</div>` : ''}
                     ${item.discount ? `<div class='item-discount'>تخفیف: ${item.discount.toLocaleString()} تومان</div>` : ''}
                   </td>
-                  <td class="quantity">${item.quantity}</td>
-                  <td class="price">${item.unitPrice.toLocaleString()}</td>
-                  <td class="price">${item.total.toLocaleString()}</td>
+                  <td class="quantity mono">${item.quantity}</td>
+                  <td class="price mono">${item.unitPrice.toLocaleString()}</td>
+                  <td class="price mono">${item.total.toLocaleString()}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -949,18 +1037,18 @@ export default function MainOrders() {
           <div class="divider"></div>
           <div class="subtotal-row">
             <span>جمع کل:</span>
-            <span>${subtotal.toLocaleString()} تومان</span>
+            <span class="mono">${subtotal.toLocaleString()} تومان</span>
           </div>
           ${totalDiscount > 0 ? `
             <div class="subtotal-row" style="color:#388e3c;">
               <span>تخفیف:</span>
-              <span>- ${totalDiscount.toLocaleString()} تومان</span>
+              <span class="mono">- ${totalDiscount.toLocaleString()} تومان</span>
             </div>
           ` : ''}
-          <div class="total-section">
+          <div class="total-section double-top">
             <div class="total-row">
               <span>مبلغ قابل پرداخت:</span>
-              <span>${Number(selectedOrder.totalPrice).toLocaleString()} تومان</span>
+              <span class="mono">${Number(selectedOrder.totalPrice).toLocaleString()} تومان</span>
             </div>
           </div>
           ${orderNotes ? `<div class="order-notes">یادداشت سفارش: ${orderNotes}</div>` : ''}
@@ -971,6 +1059,7 @@ export default function MainOrders() {
           <div class="footer">
             <p>با تشکر از خرید شما</p>
             <p>Cafe A</p>
+          </div>
           </div>
           <script>
             window.onload = function() {
@@ -1078,7 +1167,7 @@ export default function MainOrders() {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl p-4 shadow-box">
             <div className="text-center">
               <p className="text-2xl font-bold text-gray-800">{orderStats.total}</p>
@@ -1109,12 +1198,12 @@ export default function MainOrders() {
               <p className="text-sm text-gray-600">تکمیل شده</p>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-box">
+          {/* <div className="bg-white rounded-xl p-4 shadow-box">
             <div className="text-center">
               <p className="text-2xl font-bold text-teal-600">{formatPrice(orderStats.todayRevenue)}</p>
               <p className="text-sm text-gray-600">درآمد امروز</p>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Filters and Search */}
@@ -1429,11 +1518,31 @@ export default function MainOrders() {
                       </button>
                     </div>
                     {selectedCustomer && (
-                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-800">
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center justify-between">
+                        <div>
                           <i className="fi fi-rr-user mr-2"></i>
                           {selectedCustomer.name} - {selectedCustomer.phone}
-                        </p>
+                        </div>
+                        {selectedCustomer.discount_type && selectedCustomer.discount_value ? (
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-1 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="rounded"
+                                checked={applyCustomerDiscount}
+                                onChange={(e) => setApplyCustomerDiscount(e.target.checked)}
+                              />
+                              <span>اعمال تخفیف مشتری</span>
+                            </label>
+                            <span className="font-bold">
+                              {selectedCustomer.discount_type === 'percent'
+                                ? `${selectedCustomer.discount_value}%`
+                                : `${formatPrice(selectedCustomer.discount_value)} تومان`}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-blue-600">بدون تخفیف پیش‌فرض</span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1580,17 +1689,16 @@ export default function MainOrders() {
               </div>
             </div>
 
-            {/* Modal Footer - Sticky */}
+                {/* Modal Footer - Sticky */}
             <div className="sticky bottom-0 border-t border-gray-200 p-6 bg-gray-50 shadow-lg">
               <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  {Object.keys(itemQuantities).length > 0 ? (
-                    <span>
-                      {Object.values(itemQuantities).reduce((sum, qty) => sum + qty, 0)} قلم انتخاب شده
-                    </span>
-                  ) : (
-                    <span>هیچ آیتمی انتخاب نشده</span>
+                <div className="text-sm text-gray-700 space-y-1">
+                  <div>اقلام: {Object.values(itemQuantities).reduce((sum, qty) => sum + qty, 0)} قلم</div>
+                  <div>جمع اولیه: <span className="font-bold">{formatPrice(rawOrderTotal)} تومان</span></div>
+                  {applyCustomerDiscount && computedDiscountAmount > 0 && (
+                    <div className="text-green-700">تخفیف: <span className="font-bold">- {formatPrice(computedDiscountAmount)} تومان</span></div>
                   )}
+                  <div>قابل پرداخت: <span className="font-extrabold text-gray-900">{formatPrice(finalOrderTotal)} تومان</span></div>
                 </div>
                 <div className="flex gap-3">
                   <button
@@ -1634,10 +1742,10 @@ export default function MainOrders() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={handlePrintReceipt}
-                  className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors"
+                  className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
                   title="چاپ رسید"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 9V2h12v7M6 18v4h12v-4M6 14h12M6 10h12" /></svg>
+                  <i className="fi fi-rr-print text-gray-600 text-base mt-1.5"></i>
                 </button>
                 <button
                   onClick={closeOrderModal}
@@ -2009,6 +2117,14 @@ export default function MainOrders() {
                     onClick={() => {
                       setSelectedCustomer(customer);
                       setCustomerName(customer.name);
+                      // load default discount
+                      if (customer.discount_type && customer.discount_value) {
+                        setCustomerDiscount({ type: customer.discount_type as any, value: Number(customer.discount_value) });
+                        setApplyCustomerDiscount(true);
+                      } else {
+                        setCustomerDiscount(null);
+                        setApplyCustomerDiscount(false);
+                      }
                       setCustomerSearchTerm("");
                       setIsCustomerModalOpen(false);
                     }}

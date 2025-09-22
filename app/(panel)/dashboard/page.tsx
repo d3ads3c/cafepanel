@@ -23,7 +23,8 @@ interface DashboardStats {
   todayOrders: number;
   activeCustomers: number;
   averageOrder: number;
-  weeklyRevenue: number[];
+  revenueSeries: number[]; // dynamic by selected range
+  revenueCategories: string[]; // x-axis labels for chart
   topProducts: Array<{
     name: string;
     sales: number;
@@ -46,7 +47,8 @@ export default function DashboardPage() {
     todayOrders: 0,
     activeCustomers: 0,
     averageOrder: 0,
-    weeklyRevenue: [0, 0, 0, 0, 0, 0, 0],
+    revenueSeries: [],
+    revenueCategories: [],
     topProducts: [],
     recentOrders: []
   });
@@ -54,12 +56,16 @@ export default function DashboardPage() {
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [canView, setCanView] = useState<boolean | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  const [displayName, setDisplayName] = useState<string>('کاربر');
+  const [chartRange, setChartRange] = useState<'1m' | '3m' | '6m' | '1y'>('1m');
 
   useEffect(() => {
     const check = async () => {
       const res = await fetch('/api/auth/me')
       const data = await res.json()
       const perms: string[] = data?.data?.permissions || []
+      const name = data?.data?.username || 'کاربر'
+      setDisplayName(name)
       const allowed = Array.isArray(perms) && perms.includes('view_dashboard')
       setCanView(allowed)
       if (allowed) {
@@ -82,7 +88,7 @@ export default function DashboardPage() {
       fetchDashboardData();
     }, 1000);
     return () => clearTimeout(timer);
-  }, [canView]);
+  }, [canView, chartRange]);
 
   // Refresh data every 30 seconds
   useEffect(() => {
@@ -92,7 +98,7 @@ export default function DashboardPage() {
       setLastRefresh(new Date());
     }, 30000);
     return () => clearInterval(interval);
-  }, [canView]);
+  }, [canView, chartRange]);
 
   // Refresh data when page becomes visible
   useEffect(() => {
@@ -187,23 +193,32 @@ export default function DashboardPage() {
         console.log('Manual sum verification:', manualSum);
         console.log('Are they equal?', todayRevenue === manualSum);
 
-        // Calculate weekly revenue (last 7 days)
-        const weeklyRevenue = [];
-        for (let i = 6; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          const dateStr = date.toISOString().split('T')[0];
-          
-          const dayOrders = orders.filter((order: any) => 
-            order.createdAt && order.createdAt.startsWith(dateStr)
-          );
-          
-          const dayRevenue = dayOrders.reduce((sum: number, order: any) => 
-            sum + (order.totalPrice || 0), 0
-          );
-          
-          weeklyRevenue.push(dayRevenue);
+        // Build dynamic revenue series for selected range
+        const rangeDaysMap: Record<typeof chartRange, number> = { '1m': 30, '3m': 90, '6m': 180, '1y': 365 };
+        const daysBack = rangeDaysMap[chartRange];
+        const buckets: { [isoDate: string]: number } = {};
+        const categories: string[] = [];
+        for (let i = daysBack - 1; i >= 0; i--) {
+          const d = new Date();
+          d.setHours(0,0,0,0);
+          d.setDate(d.getDate() - i);
+          const iso = d.toISOString().split('T')[0];
+          buckets[iso] = 0;
+          // Persian short date label
+          categories.push(d.toLocaleDateString('fa-IR', { month: '2-digit', day: '2-digit' }));
         }
+        orders.forEach((order: any) => {
+          if (!order.createdAt) return;
+          const iso = new Date(order.createdAt).toISOString().split('T')[0];
+          if (iso in buckets) {
+            const rawTotal = order.totalPrice || order.total_price || 0;
+            const num = typeof rawTotal === 'string' ? parseFloat(rawTotal) : Number(rawTotal);
+            if (!isNaN(num) && isFinite(num)) {
+              buckets[iso] += num;
+            }
+          }
+        });
+        const revenueSeries = Object.values(buckets);
 
         // Calculate top products
         const productSales: { [key: string]: { count: number, revenue: number } } = {};
@@ -252,7 +267,8 @@ export default function DashboardPage() {
           todayOrders: todayOrders.length,
           activeCustomers: customers.length,
           averageOrder: todayOrders.length > 0 ? safeTodayRevenue / todayOrders.length : 0,
-          weeklyRevenue,
+          revenueSeries,
+          revenueCategories: categories,
           topProducts,
           recentOrders
         });
@@ -335,15 +351,7 @@ export default function DashboardPage() {
     },
     colors: ["#14b8a6"],
     xaxis: {
-      categories: [
-        "شنبه",
-        "یکشنبه",
-        "دوشنبه",
-        "سه‌شنبه",
-        "چهارشنبه",
-        "پنجشنبه",
-        "جمعه",
-      ],
+      categories: [],
       labels: {
         style: {
           fontSize: "12px",
@@ -374,7 +382,7 @@ export default function DashboardPage() {
   const areaChartSeries = [
     {
       name: "درآمد",
-      data: dashboardData.weeklyRevenue,
+      data: dashboardData.revenueSeries,
     },
   ];
 
@@ -491,7 +499,7 @@ export default function DashboardPage() {
         <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-3xl p-6 text-white">
           <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h1 className="text-2xl xl:text-3xl font-bold mb-2">عصر بخیر، نیما! 👋</h1>
+              <h1 className="text-2xl xl:text-3xl font-bold mb-2">عصر بخیر، {displayName}! 👋</h1>
               <p className="text-teal-100 text-sm xl:text-base">امروز چطور می‌توانیم به شما کمک کنیم؟</p>
               <p className="text-teal-200 text-xs mt-2">
                 {hasMounted ? (
@@ -623,9 +631,9 @@ export default function DashboardPage() {
               <span className="text-sm xl:text-base font-medium text-gray-700">منو</span>
             </Link>
             
-            <Link href="/box" className="flex flex-col items-center p-4 rounded-xl hover:bg-gray-50 transition-colors">
+            <Link href="/settings/categories" className="flex flex-col items-center p-4 rounded-xl hover:bg-gray-50 transition-colors">
               <div className="w-12 h-12 xl:w-14 xl:h-14 bg-green-100 rounded-xl flex items-center justify-center mb-3">
-                <i className="fi fi-bs-cash-register text-green-600 text-xl xl:text-2xl"></i>
+                <i className="fi fi-bs-category-alt text-green-600 text-xl xl:text-2xl"></i>
               </div>
               <span className="text-sm xl:text-base font-medium text-gray-700">صندوق ها</span>
             </Link>
@@ -644,15 +652,36 @@ export default function DashboardPage() {
           {/* Revenue Chart */}
           <div className="bg-white rounded-2xl p-4 xl:p-6 shadow-box xl:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg xl:text-xl font-bold text-gray-800">درآمد هفتگی</h3>
+              <h3 className="text-lg xl:text-xl font-bold text-gray-800">روند درآمد</h3>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
                 <span className="text-sm text-gray-600">درآمد</span>
+                <div className="ml-4 flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-1">
+                  <button
+                    className={`px-2 py-1 text-xs rounded ${chartRange === '1m' ? 'bg-teal-500 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => setChartRange('1m')}
+                  >1 ماه</button>
+                  <button
+                    className={`px-2 py-1 text-xs rounded ${chartRange === '3m' ? 'bg-teal-500 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => setChartRange('3m')}
+                  >3 ماه</button>
+                  <button
+                    className={`px-2 py-1 text-xs rounded ${chartRange === '6m' ? 'bg-teal-500 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => setChartRange('6m')}
+                  >6 ماه</button>
+                  <button
+                    className={`px-2 py-1 text-xs rounded ${chartRange === '1y' ? 'bg-teal-500 text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => setChartRange('1y')}
+                  >1 سال</button>
+                </div>
+              </div>
             </div>
-          </div>
             <div className="h-64">
             <ReactApexChart
-              options={areaChartOptions}
+              options={{
+                ...areaChartOptions,
+                xaxis: { ...areaChartOptions.xaxis, categories: dashboardData.revenueCategories }
+              }}
               series={areaChartSeries}
               type="area"
                 height="100%"
