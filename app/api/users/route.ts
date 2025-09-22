@@ -5,7 +5,7 @@ import { hasPermission } from '@/lib/permissions'
 
 // GET /api/users - list users (without password)
 export async function GET() {
-  const auth = getAuth()
+  const auth = await getAuth()
   if (!hasPermission(auth, 'manage_users')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 })
   }
@@ -24,7 +24,7 @@ export async function GET() {
 
 // POST /api/users - create user
 export async function POST(request: NextRequest) {
-  const auth = getAuth()
+  const auth = await getAuth()
   if (!hasPermission(auth, 'manage_users')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 })
   }

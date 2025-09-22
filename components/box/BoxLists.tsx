@@ -5,10 +5,16 @@ import CustomSelect from "../ui/Select";
 
 export default function BoxLists() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const Managers = ["کاربر ۱", "کاربر ۲", "کاربر ۳", "کاربر ۴", "کاربر ۵"];
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const Managers = [
+    { id: 1, name: "کاربر ۱" },
+    { id: 2, name: "کاربر ۲" },
+    { id: 3, name: "کاربر ۳" },
+    { id: 4, name: "کاربر ۴" },
+    { id: 5, name: "کاربر ۵" },
+  ];
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
-  const handleSelect = (value: string) => {
+  const handleSelect = (value: number | null) => {
     setSelectedOption(value);
   };
   const toggleDrawer = () => {

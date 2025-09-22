@@ -2,8 +2,8 @@ import Link from "next/link";
 import { getAuth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 
-export default function SettingPage() {
-  const auth = getAuth();
+export default async function SettingPage() {
+  const auth = await getAuth();
   const canManageUsers = hasPermission(auth, 'manage_users');
   return (
     <div className="xl:mt-0 mt-20">

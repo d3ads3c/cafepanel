@@ -4,7 +4,7 @@ import { getAuth } from '@/lib/auth'
 import { hasPermission } from '@/lib/permissions'
 
 export async function PUT(request: Request) {
-  const auth = getAuth()
+  const auth = await getAuth()
   if (!hasPermission(auth, 'manage_users')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 })
   }
@@ -29,7 +29,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const auth = getAuth()
+  const auth = await getAuth()
   if (!hasPermission(auth, 'manage_users')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 })
   }

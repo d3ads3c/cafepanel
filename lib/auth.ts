@@ -41,8 +41,8 @@ export function verifyToken(token: string | undefined | null): AuthPayload | nul
   }
 }
 
-export function setAuthCookie(token: string) {
-  cookies().set('auth_token', token, {
+export async function setAuthCookie(token: string) {
+  (await cookies()).set('auth_token', token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -51,12 +51,12 @@ export function setAuthCookie(token: string) {
   })
 }
 
-export function clearAuthCookie() {
-  cookies().set('auth_token', '', { path: '/', maxAge: 0 })
+export async function clearAuthCookie() {
+  (await cookies()).set('auth_token', '', { path: '/', maxAge: 0 })
 }
 
-export function getAuth(): AuthPayload | null {
-  const token = cookies().get('auth_token')?.value
+export async function getAuth(): Promise<AuthPayload | null> {
+  const token = (await cookies()).get('auth_token')?.value
   return verifyToken(token)
 }
 
