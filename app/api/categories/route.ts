@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { getAuth } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 
 // GET - Fetch all categories
 export async function GET(request: NextRequest) {
@@ -42,6 +44,10 @@ export async function GET(request: NextRequest) {
 
 // POST - Create new category
 export async function POST(request: NextRequest) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_categories')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   try {
     const body = await request.json();
     

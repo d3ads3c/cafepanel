@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getAuth } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 
 export async function GET() {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_customers')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   let connection;
   try {
     connection = await pool.getConnection();
@@ -55,6 +61,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_customers')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   let connection;
   try {
     const { name, phone, email, address, notes, discount_type, discount_value } = await request.json();

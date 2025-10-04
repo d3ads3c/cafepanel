@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isLogin = pathname === '/'
-  const protectedPrefixes = ['/dashboard', '/orders', '/menu', '/box', '/customers', '/settings']
+  const protectedPrefixes = ['/dashboard', '/orders', '/menu', '/box', '/customers', '/settings', '/accounting']
   const isProtected = protectedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   if (isProtected && !token) {
@@ -30,6 +30,7 @@ export const config = {
     '/box/:path*',
     '/customers/:path*',
     '/settings/:path*',
+    '/accounting/:path*',
   ],
 }
 

@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getAuth } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 
 // PUT - Update status
 export async function PUT(request: Request) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_buylist')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   const body = await request.json();
   const { bl_status } = body;
   // Validate that bl_status is either a boolean or "true"/"false" string
@@ -56,6 +62,10 @@ export async function PUT(request: Request) {
 export async function DELETE(
   request: Request
 ) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_buylist')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   const pathname = new URL(request.url).pathname;
   const match = pathname.match(/\/api\/buylist\/([^/]+)(?:\/)?$/);
   const idParam = match?.[1];

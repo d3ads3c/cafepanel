@@ -4,6 +4,8 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import pool from '@/lib/db';
+import { getAuth } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 
 // GET - Fetch single menu item
 export async function GET(
@@ -77,6 +79,10 @@ export async function GET(
 export async function PUT(
   request: Request
 ) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_menu')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   try {
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/menu\/([^/]+)(?:\/)?$/);
@@ -214,6 +220,10 @@ export async function PUT(
 export async function DELETE(
   request: Request
 ) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_menu')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   try {
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/menu\/([^/]+)(?:\/)?$/);

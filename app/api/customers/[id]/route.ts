@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getAuth } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 
 export async function GET(
   request: Request
 ) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_customers')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   try {
     const connection = await pool.getConnection();
     const pathname = new URL(request.url).pathname;
@@ -49,6 +55,10 @@ export async function GET(
 export async function PUT(
   request: Request
 ) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_customers')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   try {
     const { name, phone, email, address, notes, discount_type, discount_value } = await request.json();
     const pathname = new URL(request.url).pathname;
@@ -117,6 +127,10 @@ export async function PUT(
 export async function DELETE(
   request: Request
 ) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_customers')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   try {
     const connection = await pool.getConnection();
     const pathname = new URL(request.url).pathname;

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getAuth } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 
 // GET all buylist items
 export async function GET() {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_buylist')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   try {
     const connection = await pool.getConnection();
     const [rows] = await connection.execute("SELECT * FROM buylist");
@@ -18,6 +24,10 @@ export async function GET() {
 
 // POST new buylist item
 export async function POST(request: NextRequest) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_buylist')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   const body = await request.json();
   const { bl_item, bl_info } = body;
 

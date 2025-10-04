@@ -7,6 +7,7 @@ export default function DesktopSidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [displayName, setDisplayName] = useState<string>('کاربر');
+  const [permissions, setPermissions] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -14,7 +15,9 @@ export default function DesktopSidebar() {
         const res = await fetch('/api/auth/me');
         const data = await res.json();
         const name = data?.data?.username || 'کاربر';
+        const perms: string[] = data?.data?.permissions || [];
         setDisplayName(name);
+        setPermissions(perms);
       } catch {}
     })();
   }, []);
@@ -24,25 +27,36 @@ export default function DesktopSidebar() {
       href: "/dashboard",
       icon: "fi fi-sr-house-blank",
       label: "خانه",
-      active: pathname === "/dashboard"
+      active: pathname === "/dashboard",
+      permission: "view_dashboard"
     },
     {
       href: "/orders",
       icon: "fi fi-rr-rectangle-list",
       label: "سفارشات",
-      active: pathname === "/orders"
+      active: pathname === "/orders",
+      permission: "manage_orders"
     },
     {
       href: "/customers",
       icon: "fi fi-rr-users",
       label: "مشتریان",
-      active: pathname === "/customers"
+      active: pathname === "/customers",
+      permission: "manage_customers"
     },
     {
       href: "/menu",
       icon: "fi fi-rr-boxes",
       label: "منو",
-      active: pathname === "/menu"
+      active: pathname === "/menu",
+      permission: "manage_menu"
+    },
+    {
+      href: "/accounting",
+      icon: "fi fi-rr-calculator",
+      label: "حسابداری",
+      active: pathname.startsWith("/accounting"),
+      permission: "manage_accounting"
     },
     // {
     //   href: "/box",
@@ -54,9 +68,10 @@ export default function DesktopSidebar() {
       href: "/settings",
       icon: "fi fi-rr-settings",
       label: "تنظیمات",
-      active: pathname.startsWith("/settings")
+      active: pathname.startsWith("/settings"),
+      permission: "manage_users"
     }
-  ];
+  ].filter(item => !item.permission || permissions.includes(item.permission));
 
   return (
     <div className={`hidden xl:flex flex-col bg-white border-l border-gray-200 transition-all duration-300 ${

@@ -4,8 +4,14 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import pool from '@/lib/db';
+import { getAuth } from '@/lib/auth';
+import { hasPermission } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
+  const auth = await getAuth();
+  if (!hasPermission(auth, 'manage_menu')) {
+    return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
+  }
   try {
     const body = await request.json();
     
