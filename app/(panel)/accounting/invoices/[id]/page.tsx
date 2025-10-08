@@ -35,6 +35,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [payment, setPayment] = useState({ amount: 0, method: 'cash' as 'cash' | 'card' | 'bank_transfer' | 'credit', bank_account_id: '', paid_at: '', notes: '' });
 
   useEffect(() => {
     const checkPermission = async () => {
@@ -74,6 +75,29 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
       router.push('/accounting');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const submitPayment = async () => {
+    try {
+      const res = await fetch('/api/accounting/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoice_id: Number(params.id),
+          amount: Number(payment.amount || 0),
+          method: payment.method,
+          bank_account_id: payment.bank_account_id || null,
+          paid_at: payment.paid_at || null,
+          notes: payment.notes || null,
+        })
+      });
+      if (res.ok) {
+        setPayment({ amount: 0, method: 'cash', bank_account_id: '', paid_at: '', notes: '' });
+        fetchInvoice();
+      }
+    } catch (e) {
+      console.error('payment error', e);
     }
   };
 
@@ -311,17 +335,56 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
           </div>
         )}
 
+        {/* Payments */}
+        <div className="bg-white rounded-lg shadow-box p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">پرداخت‌ها</h3>
+          <div className="overflow-x-auto mb-4">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">مبلغ</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">روش</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">حساب بانکی</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاریخ</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {(invoice as any)?.payments?.map((p: any, idx: number) => (
+                  <tr key={idx}>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{new Intl.NumberFormat('fa-IR').format(p.amount)}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{p.method}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{p.bank_name || '-'}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(p.paid_at).toLocaleString('fa-IR')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input type="number" placeholder="مبلغ" value={payment.amount} onChange={(e) => setPayment({ ...payment, amount: Number(e.target.value || 0) })} className="rounded-xl border-gray-300" />
+            <select value={payment.method} onChange={(e) => setPayment({ ...payment, method: e.target.value as any })} className="rounded-xl border-gray-300">
+              <option value="cash">نقدی</option>
+              <option value="card">کارت</option>
+              <option value="bank_transfer">انتقال بانکی</option>
+              <option value="credit">اعتباری</option>
+            </select>
+            <input placeholder="شناسه حساب بانکی" value={payment.bank_account_id} onChange={(e) => setPayment({ ...payment, bank_account_id: e.target.value })} className="rounded-xl border-gray-300" />
+            <input type="datetime-local" value={payment.paid_at} onChange={(e) => setPayment({ ...payment, paid_at: e.target.value })} className="rounded-xl border-gray-300" />
+            <button onClick={submitPayment} className="rounded-xl bg-teal-600 text-white px-4">ثبت پرداخت</button>
+          </div>
+        </div>
+
         {/* Actions */}
         <div className="flex gap-4 justify-end">
           <button
             onClick={() => router.back()}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm active:scale-[.99]"
           >
             بازگشت
           </button>
           <button
             onClick={() => window.print()}
-            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm active:scale-[.99]"
           >
             <i className="fi fi-rr-print mr-2"></i>
             چاپ

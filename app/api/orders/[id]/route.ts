@@ -95,6 +95,43 @@ export async function PUT(
         );
       }
 
+      // If order is being completed, create accounting entries
+      if (body.status === 'completed') {
+        try {
+          // Get order details for accounting
+          const [orderDetails] = await connection.execute(
+            'SELECT customer_name, total_price, payment_method, created_at FROM orders WHERE order_ID = ?',
+            [orderId]
+          );
+          
+          if (orderDetails && (orderDetails as any[])[0]) {
+            const order = (orderDetails as any[])[0];
+            
+            // Create accounting entries
+            const accountingResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/accounting/orders-integration`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId: orderId,
+                orderData: {
+                  customerName: order.customer_name,
+                  totalPrice: order.total_price,
+                  paymentMethod: order.payment_method,
+                  createdAt: order.created_at
+                }
+              })
+            });
+            
+            if (!accountingResponse.ok) {
+              console.error('Failed to create accounting entries for order:', orderId);
+            }
+          }
+        } catch (accountingError) {
+          console.error('Error creating accounting entries:', accountingError);
+          // Don't fail the order update if accounting fails
+        }
+      }
+
       console.log('Order updated:', {
         orderId,
         status: body.status,

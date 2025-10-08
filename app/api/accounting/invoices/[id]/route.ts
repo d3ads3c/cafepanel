@@ -31,17 +31,21 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ success: false, message: 'فاکتور یافت نشد' }, { status: 404 });
     }
 
-    // Get invoice items
+    // Get invoice items and payments
     const [itemRows] = await connection.execute(`
       SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id
+    `, [invoiceId]);
+    const [paymentRows] = await connection.execute(`
+      SELECT p.*, b.name as bank_name FROM payments p LEFT JOIN bank_accounts b ON b.id = p.bank_account_id WHERE p.invoice_id = ? ORDER BY p.paid_at DESC
     `, [invoiceId]);
 
     const invoice = (invoiceRows as any[])[0];
     const items = itemRows as any[];
+    const payments = paymentRows as any[];
 
     return NextResponse.json({ 
       success: true, 
-      data: { ...invoice, items }
+      data: { ...invoice, items, payments }
     });
 
   } catch (e) {
