@@ -58,12 +58,12 @@ export default function DesktopSidebar() {
       active: pathname.startsWith("/accounting"),
       permission: "manage_accounting"
     },
-    // {
-    //   href: "/box",
-    //   icon: "fi fi-bs-cash-register",
-    //   label: "صندوق ها",
-    //   active: pathname === "/box"
-    // },
+    {
+      href: "/shop",
+      icon: "fi fi-rr-shop",
+      label: "فروشگاه",
+      active: pathname === "/shop"
+    },
     {
       href: "/settings",
       icon: "fi fi-rr-settings",

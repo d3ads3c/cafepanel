@@ -4,7 +4,6 @@ import MobileHead from "@/components/HeadBar";
 import DesktopSidebar from "@/components/DesktopSidebar";
 import DesktopHeader from "@/components/DesktopHeader";
 
-import "../globals.css";
 
 export const metadata: Metadata = {
   title: "پنل مدیریت کسب و کار آرمان آپس",
