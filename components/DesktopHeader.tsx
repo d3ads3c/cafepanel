@@ -74,12 +74,12 @@ export default function DesktopHeader() {
 
         {/* User Menu */}
         <div className="flex items-center gap-3">
-          <button type="button" className="border border-teal-600 text-teal-600 rounded-xl py-2 text-sm px-3 flex items-center gap-2">
+          {/* <button type="button" className="border border-teal-600 text-teal-600 rounded-xl py-2 text-sm px-3 flex items-center gap-2">
             <div className="rounded-full bg-teal-600 text-white size-6 flex items-center justify-center">
               0
             </div>
             <p>سبد خرید شما</p>
-          </button>
+          </button> */}
           <button onClick={handleLogout} className="inline-flex items-center gap-2 px-3 py-1 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors">
             <i className="fi fi-sr-power mt-1.5 text-red-500"></i>
             <span className="text-sm">خروج</span>

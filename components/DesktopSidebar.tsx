@@ -51,19 +51,19 @@ export default function DesktopSidebar() {
       active: pathname === "/menu",
       permission: "manage_menu"
     },
-    {
-      href: "/accounting",
-      icon: "fi fi-rr-calculator",
-      label: "حسابداری",
-      active: pathname.startsWith("/accounting"),
-      permission: "manage_accounting"
-    },
-    {
-      href: "/shop",
-      icon: "fi fi-rr-shop",
-      label: "فروشگاه",
-      active: pathname === "/shop"
-    },
+    // {
+    //   href: "/accounting",
+    //   icon: "fi fi-rr-calculator",
+    //   label: "حسابداری",
+    //   active: pathname.startsWith("/accounting"),
+    //   permission: "manage_accounting"
+    // },
+    // {
+    //   href: "/shop",
+    //   icon: "fi fi-rr-shop",
+    //   label: "فروشگاه",
+    //   active: pathname === "/shop"
+    // },
     {
       href: "/settings",
       icon: "fi fi-rr-settings",
