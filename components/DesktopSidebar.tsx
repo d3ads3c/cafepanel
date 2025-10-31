@@ -65,12 +65,20 @@ export default function DesktopSidebar() {
     //   active: pathname === "/shop"
     // },
     {
+      href: "/prices",
+      icon: "fi fi-rr-usd-circle",
+      label: "قیمت رقبا",
+      active: pathname.startsWith("/prices"),
+      permission: "manage_menu"
+    },
+    {
       href: "/settings",
       icon: "fi fi-rr-settings",
       label: "تنظیمات",
       active: pathname.startsWith("/settings"),
       permission: "manage_users"
     }
+    
   ].filter(item => !item.permission || permissions.includes(item.permission));
 
   return (
