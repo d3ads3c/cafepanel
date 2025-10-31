@@ -18,7 +18,7 @@ export default function DesktopSidebar() {
         const perms: string[] = data?.data?.permissions || [];
         setDisplayName(name);
         setPermissions(perms);
-      } catch {}
+      } catch { }
     })();
   }, []);
 
@@ -68,6 +68,7 @@ export default function DesktopSidebar() {
       href: "/prices",
       icon: "fi fi-rr-usd-circle",
       label: "قیمت رقبا",
+      test: true,
       active: pathname.startsWith("/prices"),
       permission: "manage_menu"
     },
@@ -78,13 +79,12 @@ export default function DesktopSidebar() {
       active: pathname.startsWith("/settings"),
       permission: "manage_users"
     }
-    
+
   ].filter(item => !item.permission || permissions.includes(item.permission));
 
   return (
-    <div className={`hidden xl:flex flex-col bg-white border-l border-gray-200 transition-all duration-300 ${
-      isCollapsed ? 'w-16' : 'w-64'
-    }`}>
+    <div className={`hidden xl:flex flex-col bg-white border-l border-gray-200 transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'
+      }`}>
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center justify-between">
@@ -110,15 +110,21 @@ export default function DesktopSidebar() {
             <li key={item.href}>
               <Link
                 href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
-                  item.active
-                    ? 'bg-teal-50 text-teal-600 border-r-2 border-teal-600'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${item.active
+                  ? 'bg-teal-50 text-teal-600 border-r-2 border-teal-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
               >
                 <i className={`${item.icon} text-xl ${item.active ? 'text-teal-600' : 'text-gray-500 group-hover:text-gray-700'}`}></i>
                 {!isCollapsed && (
-                  <span className="font-medium">{item.label}</span>
+                  <div className="font-medium flex items-center gap-3">
+                    <span>{item.label}</span>
+                    {item.test && (
+                      <div className="rounded-full py-1 px-3 bg-teal-100 text-teal-500 text-xs">
+                        آزمایشی
+                      </div>
+                    )}
+                  </div>
                 )}
               </Link>
             </li>
