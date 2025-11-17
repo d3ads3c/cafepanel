@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
+import LoveModalController from "@/components/LoveModalController";
 
 const vazir = localFont({
   src: [
@@ -38,7 +39,7 @@ export default function RootLayout({
     <html lang="fa" dir="rtl" className="">
       <body className={`${vazir.className} antialiased hide-scroll`}>
         {children}
-        <Toaster 
+        <Toaster
           position="top-right"
           toastOptions={{
             duration: 4000,
@@ -60,6 +61,7 @@ export default function RootLayout({
             },
           }}
         />
+        <LoveModalController />
       </body>
     </html>
   );
