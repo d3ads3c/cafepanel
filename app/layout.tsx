@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
-import LoveModalController from "@/components/LoveModalController";
+// import LoveModalController from "@/components/LoveModalController";
 
 const vazir = localFont({
   src: [
@@ -61,7 +61,7 @@ export default function RootLayout({
             },
           }}
         />
-        <LoveModalController />
+        {/* <LoveModalController /> */}
       </body>
     </html>
   );

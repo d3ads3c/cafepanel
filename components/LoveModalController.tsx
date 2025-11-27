@@ -24,6 +24,14 @@ export default function LoveModalController() {
   }, [])
 
   useEffect(() => {
+    // If not acknowledged, show the modal immediately (once)
+    if (acknowledged === false && !hasShownRef.current) {
+      hasShownRef.current = true
+      setVisible(true)
+      return
+    }
+
+    // Keep click listener as fallback for older behavior (optional)
     function onClick(e: MouseEvent) {
       try {
         const path = (e.composedPath && e.composedPath()) || (e as any).path || []
@@ -32,7 +40,7 @@ export default function LoveModalController() {
 
         const target = e.target as HTMLElement | null
         if (!target) return
-        if (target.tagName === 'BUTTON' || target.closest && target.closest('button')) {
+        if (target.tagName === 'BUTTON' || (target.closest && target.closest('button'))) {
           if (acknowledged) return
           // only show once per page load
           if (hasShownRef.current) return

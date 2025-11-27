@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { executeQuery } from '@/lib/dbHelper';
 import { getAuth } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 
@@ -12,34 +12,27 @@ export async function GET(
     const match = pathname.match(/\/api\/categories\/([^/]+)(?:\/)?$/);
     const categoryId = match?.[1];
     
-    const connection = await pool.getConnection();
-    
-    const selectQuery = `
-      SELECT 
-        category_ID,
-        category_name
-      FROM categories 
-      WHERE category_ID = ?
-    `;
-    
-    const [rows] = await connection.execute(selectQuery, [categoryId]);
-    connection.release();
+    const category = await executeQuery(async (connection) => {
+      const selectQuery = `
+        SELECT 
+          category_ID,
+          category_name
+        FROM categories 
+        WHERE category_ID = ?
+      `;
+      
+      const [rows] = await connection.execute(selectQuery, [categoryId]);
 
-    if ((rows as any[]).length === 0) {
-      return NextResponse.json(
-        { 
-          success: false,
-          message: 'دسته‌بندی مورد نظر یافت نشد' 
-        },
-        { status: 404 }
-      );
-    }
+      if ((rows as any[]).length === 0) {
+        throw { status: 404, message: 'دسته‌بندی مورد نظر یافت نشد' };
+      }
 
-    const item = (rows as any[])[0];
-    const category = {
-      id: item.category_ID,
-      name: item.category_name
-    };
+      const item = (rows as any[])[0];
+      return {
+        id: item.category_ID,
+        name: item.category_name
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -82,40 +75,34 @@ export async function PUT(
 
     const categoryName = body.name.trim();
 
-    const connection = await pool.getConnection();
-    
-    // Check if category name already exists (excluding current category)
-    const checkQuery = `
-      SELECT category_ID FROM categories 
-      WHERE category_name = ? AND category_ID != ?
-    `;
-    
-    const [existingRows] = await connection.execute(checkQuery, [categoryName, categoryId]);
-    
-    if ((existingRows as any[]).length > 0) {
-      connection.release();
-      return NextResponse.json(
-        { message: 'دسته‌بندی با این نام قبلاً وجود دارد' },
-        { status: 400 }
-      );
-    }
+    const result = await executeQuery(async (connection) => {
+      // Check if category name already exists (excluding current category)
+      const checkQuery = `
+        SELECT category_ID FROM categories 
+        WHERE category_name = ? AND category_ID != ?
+      `;
+      
+      const [existingRows] = await connection.execute(checkQuery, [categoryName, categoryId]);
+      
+      if ((existingRows as any[]).length > 0) {
+        throw { status: 400, message: 'دسته‌بندی با این نام قبلاً وجود دارد' };
+      }
 
-    // Update category
-    const updateQuery = `
-      UPDATE categories 
-      SET category_name = ?
-      WHERE category_ID = ?
-    `;
-    
-    const [result] = await connection.execute(updateQuery, [categoryName, categoryId]);
-    connection.release();
+      // Update category
+      const updateQuery = `
+        UPDATE categories 
+        SET category_name = ?
+        WHERE category_ID = ?
+      `;
+      
+      const [updateResult] = await connection.execute(updateQuery, [categoryName, categoryId]);
 
-    if ((result as any).affectedRows === 0) {
-      return NextResponse.json(
-        { message: 'دسته‌بندی مورد نظر یافت نشد' },
-        { status: 404 }
-      );
-    }
+      if ((updateResult as any).affectedRows === 0) {
+        throw { status: 404, message: 'دسته‌بندی مورد نظر یافت نشد' };
+      }
+
+      return updateResult;
+    });
 
     console.log('Category updated:', {
       id: categoryId,
@@ -155,49 +142,41 @@ export async function DELETE(
     const match = pathname.match(/\/api\/categories\/([^/]+)(?:\/)?$/);
     const categoryId = match?.[1];
     
-    const connection = await pool.getConnection();
-    
-    // Check if category exists
-    const checkQuery = `
-      SELECT category_ID FROM categories 
-      WHERE category_ID = ?
-    `;
-    
-    const [existingRows] = await connection.execute(checkQuery, [categoryId]);
-    
-    if ((existingRows as any[]).length === 0) {
-      connection.release();
-      return NextResponse.json(
-        { message: 'دسته‌بندی مورد نظر یافت نشد' },
-        { status: 404 }
-      );
-    }
+    const result = await executeQuery(async (connection) => {
+      // Check if category exists
+      const checkQuery = `
+        SELECT category_ID FROM categories 
+        WHERE category_ID = ?
+      `;
+      
+      const [existingRows] = await connection.execute(checkQuery, [categoryId]);
+      
+      if ((existingRows as any[]).length === 0) {
+        throw { status: 404, message: 'دسته‌بندی مورد نظر یافت نشد' };
+      }
 
-    // Check if category is being used in menu items
-    const checkUsageQuery = `
-      SELECT COUNT(*) as count FROM menu 
-      WHERE menu_category = ?
-    `;
-    
-    const [usageRows] = await connection.execute(checkUsageQuery, [categoryId]);
-    const usageCount = (usageRows as any[])[0].count;
-    
-    if (usageCount > 0) {
-      connection.release();
-      return NextResponse.json(
-        { message: `این دسته‌بندی در ${usageCount} آیتم منو استفاده شده و قابل حذف نیست` },
-        { status: 400 }
-      );
-    }
+      // Check if category is being used in menu items
+      const checkUsageQuery = `
+        SELECT COUNT(*) as count FROM menu 
+        WHERE menu_category = ?
+      `;
+      
+      const [usageRows] = await connection.execute(checkUsageQuery, [categoryId]);
+      const usageCount = (usageRows as any[])[0].count;
+      
+      if (usageCount > 0) {
+        throw { status: 400, message: `این دسته‌بندی در ${usageCount} آیتم منو استفاده شده و قابل حذف نیست` };
+      }
 
-    // Delete category
-    const deleteQuery = `
-      DELETE FROM categories 
-      WHERE category_ID = ?
-    `;
-    
-    const [result] = await connection.execute(deleteQuery, [categoryId]);
-    connection.release();
+      // Delete category
+      const deleteQuery = `
+        DELETE FROM categories 
+        WHERE category_ID = ?
+      `;
+      
+      const [deleteResult] = await connection.execute(deleteQuery, [categoryId]);
+      return deleteResult;
+    });
 
     console.log('Category deleted:', {
       id: categoryId

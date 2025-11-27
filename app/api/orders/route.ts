@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { executeQuery, executeTransaction } from '@/lib/dbHelper';
 import { getAuth } from '@/lib/auth';
 import { hasPermission } from '@/lib/permissions';
 
@@ -9,52 +9,50 @@ export async function GET(request: NextRequest) {
   if (!hasPermission(auth, 'manage_orders')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
-  let connection;
   try {
-    connection = await pool.getConnection();
-    
-    const selectQuery = `
-      SELECT 
-        o.order_ID,
-        o.customer_name,
-        o.table_number,
-        o.total_items,
-        o.total_price,
-        o.order_status,
-        o.payment_method,
-        o.created_at,
-        o.updated_at,
-        JSON_ARRAYAGG(
-          JSON_OBJECT(
-            'order_item_ID', oi.order_item_ID,
-            'menu_ID', oi.menu_ID,
-            'item_name', oi.item_name,
-            'item_price', oi.item_price,
-            'quantity', oi.quantity
-          )
-        ) as items
-      FROM orders o
-      LEFT JOIN order_items oi ON o.order_ID = oi.order_ID
-      GROUP BY o.order_ID
-      ORDER BY o.created_at DESC
-    `;
-    
-    const [rows] = await connection.execute(selectQuery);
-    connection.release();
+    const orders = await executeQuery(async (connection) => {
+      const selectQuery = `
+        SELECT 
+          o.order_ID,
+          o.customer_name,
+          o.table_number,
+          o.total_items,
+          o.total_price,
+          o.order_status,
+          o.payment_method,
+          o.created_at,
+          o.updated_at,
+          JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'order_item_ID', oi.order_item_ID,
+              'menu_ID', oi.menu_ID,
+              'item_name', oi.item_name,
+              'item_price', oi.item_price,
+              'quantity', oi.quantity
+            )
+          ) as items
+        FROM orders o
+        LEFT JOIN order_items oi ON o.order_ID = oi.order_ID
+        GROUP BY o.order_ID
+        ORDER BY o.created_at DESC
+      `;
+      
+      const [rows] = await connection.execute(selectQuery);
 
-    // Format the data for frontend
-    const orders = (rows as any[]).map(row => ({
-      id: row.order_ID,
-      customerName: row.customer_name,
-      tableNumber: row.table_number,
-      totalItems: row.total_items,
-      totalPrice: row.total_price,
-      status: row.order_status,
-      paymentMethod: row.payment_method,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      items: row.items ? JSON.parse(row.items) : []
-    }));
+      // Format the data for frontend
+      return (rows as any[]).map(row => ({
+        id: row.order_ID,
+        customerName: row.customer_name,
+        tableNumber: row.table_number,
+        totalItems: row.total_items,
+        totalPrice: row.total_price,
+        status: row.order_status,
+        paymentMethod: row.payment_method,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        items: row.items ? JSON.parse(row.items) : []
+      }));
+    });
 
     return NextResponse.json({
       success: true,
@@ -70,10 +68,6 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    if (connection) {
-      connection.release();
-    }
   }
 }
 
@@ -94,12 +88,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const connection = await pool.getConnection();
-    
-    try {
-      // Start transaction
-      await connection.beginTransaction();
-
+    const result = await executeTransaction(async (connection) => {
       // Insert order
       const insertOrderQuery = `
         INSERT INTO orders 
@@ -140,9 +129,6 @@ export async function POST(request: NextRequest) {
         await connection.execute(insertItemQuery, itemValues);
       }
 
-      // Commit transaction
-      await connection.commit();
-
       console.log('Order created successfully:', {
         orderId,
         customerName: body.customerName,
@@ -150,26 +136,21 @@ export async function POST(request: NextRequest) {
         totalPrice
       });
 
-      return NextResponse.json({
-        success: true,
-        message: 'سفارش با موفقیت ثبت شد',
-        data: {
-          id: orderId,
-          customerName: body.customerName,
-          tableNumber: body.tableNumber,
-          totalItems,
-          totalPrice,
-          status: 'pending'
-        }
-      }, { status: 201 });
+      return {
+        id: orderId,
+        customerName: body.customerName,
+        tableNumber: body.tableNumber,
+        totalItems,
+        totalPrice,
+        status: 'pending'
+      };
+    });
 
-    } catch (dbError) {
-      // Rollback transaction on error
-      await connection.rollback();
-      throw dbError;
-    } finally {
-      connection.release();
-    }
+    return NextResponse.json({
+      success: true,
+      message: 'سفارش با موفقیت ثبت شد',
+      data: result
+    }, { status: 201 });
 
   } catch (error) {
     console.error('Error creating order:', error);

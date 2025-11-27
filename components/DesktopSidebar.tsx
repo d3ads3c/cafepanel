@@ -90,7 +90,7 @@ export default function DesktopSidebar() {
         <div className="flex items-center justify-between">
           {!isCollapsed && (
             <div>
-              <h1 className="text-xl font-bold text-gray-800">کافه پنل</h1>
+              <h1 className="text-xl font-bold text-gray-800">کافه ای</h1>
               <p className="text-sm text-gray-500">پنل مدیریت</p>
             </div>
           )}

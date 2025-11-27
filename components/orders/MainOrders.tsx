@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import JalaliRangePicker from "@/components/ui/JalaliRangePicker";
 
 export default function MainOrders() {
   // Payment method modal state (must be inside component)
@@ -65,7 +66,12 @@ export default function MainOrders() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
   const [orderModalSearchTerm, setOrderModalSearchTerm] = useState<string>("");
+  const [orderModalCategoryId, setOrderModalCategoryId] = useState<number | null>(null);
   const [newItemsToAdd, setNewItemsToAdd] = useState<{ [key: number]: number }>({});
+  const [datePickerType, setDatePickerType] = useState<"quick" | "jalali">("quick");
+  const [customDateFrom, setCustomDateFrom] = useState<string>("");
+  const [customDateTo, setCustomDateTo] = useState<string>("");
+  const [jalaliDateRange, setJalaliDateRange] = useState<{ from: string | null; to: string | null }>({ from: null, to: null });
   const [tables, setTables] = useState<Array<{
     id: number;
     table_number: string;
@@ -87,6 +93,8 @@ export default function MainOrders() {
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [selectedTable, setSelectedTable] = useState<any>(null);
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>("");
+  const [favoriteItems, setFavoriteItems] = useState<number[]>([]);
+  const [favoriteMap, setFavoriteMap] = useState<{ [key: number]: number }>({});
 
   useEffect(() => {
     fetchCategories();
@@ -94,7 +102,27 @@ export default function MainOrders() {
     fetchOrders();
     fetchTables();
     fetchCustomers();
+    fetchFavorites();
   }, []);
+
+  const fetchFavorites = async () => {
+    try {
+      const res = await fetch("/api/favorites");
+      const data = await res.json();
+      if (data.success && data.data) {
+        const favIds = data.data.map((item: any) => item.id);
+        const favMap = data.data.reduce((acc: any, item: any) => {
+          acc[item.id] = item.favoriteId;
+          return acc;
+        }, {});
+        setFavoriteItems(favIds);
+        setFavoriteMap(favMap);
+        console.log("Favorites fetched:", favIds);
+      }
+    } catch (error) {
+      console.error("Error fetching favorites:", error);
+    }
+  };
 
   const fetchCategories = async () => {
     const res = await fetch("/api/categories");
@@ -222,6 +250,62 @@ export default function MainOrders() {
     return itemQuantities[itemId] || 0;
   };
 
+  const toggleFavorite = (itemId: number) => {
+    const isCurrent = favoriteItems.includes(itemId);
+
+    if (isCurrent) {
+      // Remove from favorites
+      const favoriteId = favoriteMap[itemId];
+      fetch(`/api/favorites/${favoriteId}`, { method: "DELETE" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            setFavoriteItems((prev) => prev.filter((id) => id !== itemId));
+            setFavoriteMap((prev) => {
+              const newMap = { ...prev };
+              delete newMap[itemId];
+              return newMap;
+            });
+            toast.success("از پرفروش‌ترین حذف شد");
+          } else {
+            toast.error(data.message || "خطا در حذف");
+          }
+        })
+        .catch((err) => {
+          console.error("Error removing favorite:", err);
+          toast.error("خطا در حذف");
+        });
+    } else {
+      // Add to favorites
+      fetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ menuId: itemId }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            setFavoriteItems((prev) => [...prev, itemId]);
+            setFavoriteMap((prev) => ({
+              ...prev,
+              [itemId]: data.data.favoriteId,
+            }));
+            toast.success("به پرفروش‌ترین اضافه شد");
+          } else {
+            toast.error(data.message || "خطا در افزودن");
+          }
+        })
+        .catch((err) => {
+          console.error("Error adding favorite:", err);
+          toast.error("خطا در افزودن");
+        });
+    }
+  };
+
+  const isFavorite = (itemId: number) => {
+    return favoriteItems.includes(itemId);
+  };
+
   const formatPrice = (price: number | string) => {
     const numPrice = typeof price === "string" ? parseFloat(price) : price;
     // Round to remove decimal places and format with commas
@@ -238,6 +322,7 @@ export default function MainOrders() {
     setSelectedOrder(null);
     setIsOrderModalOpen(false);
     setOrderModalSearchTerm("");
+    setOrderModalCategoryId(null);
     setNewItemsToAdd({});
   };
 
@@ -427,6 +512,32 @@ export default function MainOrders() {
     }
   };
 
+  const deleteOrder = async () => {
+    if (!selectedOrder) return;
+
+    const confirmed = confirm("آیا مطمئن هستید که می‌خواهید این سفارش را حذف کنید؟");
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/orders/${selectedOrder.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success("سفارش حذف شد");
+        closeOrderModal();
+        fetchOrders(); // Refresh orders list
+      } else {
+        toast.error(data.message || "خطا در حذف سفارش");
+      }
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      toast.error("خطا در حذف سفارش");
+    }
+  };
+
   const changeOrderStatus = async (orderId: number, currentStatus: string) => {
     let newStatus: string;
     switch (currentStatus) {
@@ -575,15 +686,18 @@ export default function MainOrders() {
     }
   };
 
+  // Filter items - exclude favorites from main grid when showing -1 category
   const filteredItems = searchTerm
     ? items.filter((item) =>
       item.name.toLowerCase().includes(searchTerm.toLowerCase())
     )
-    : selectedCategoryId !== null && selectedCategoryId !== undefined
-      ? items.filter((item) => Number(item.categoryId) === selectedCategoryId)
-      : items;
+    : selectedCategoryId === -1
+      ? [] // Don't show duplicates in main grid - favorites shown in separate section
+      : selectedCategoryId !== null && selectedCategoryId !== undefined
+        ? items.filter((item) => Number(item.categoryId) === selectedCategoryId)
+        : items;
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("today");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("table");
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -604,27 +718,29 @@ export default function MainOrders() {
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
+  // Calculate daily order numbers (reset each day)
+  const getDailyOrderNumber = (order: any) => {
+    const todayOrderList = orders.filter(o => {
+      const orderDate = new Date(o.createdAt);
+      return orderDate >= todayStart && orderDate < todayEnd && o.status !== 'cancelled';
+    }).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    const orderIndex = todayOrderList.findIndex(o => o.id === order.id);
+    return orderIndex >= 0 ? orderIndex + 1 : '-';
+  };
+
+  // Get daily order number for display
+  const getDisplayOrderNumber = (order: any) => {
+    const dailyNum = getDailyOrderNumber(order);
+    return dailyNum !== '-' ? `${dailyNum}` : `#${order.id}`;
+  };
+
   const todayOrders = orders.filter(o => {
     if (!o.createdAt) return false;
     if (o.status === 'cancelled') return false;
     const orderDate = new Date(o.createdAt);
     return orderDate >= todayStart && orderDate < todayEnd;
   });
-
-  const orderStats = {
-    total: orders.filter(o => o.status !== "cancelled").length,
-    pending: orders.filter(o => o.status === "pending").length,
-    preparing: orders.filter(o => o.status === "preparing").length,
-    ready: orders.filter(o => o.status === "ready").length,
-    completed: orders.filter(o => o.status === "completed").length,
-    cancelled: orders.filter(o => o.status === "cancelled").length,
-    todayRevenue: todayOrders.reduce((sum, o) => {
-      const rawTotal = o.totalPrice || 0;
-      const orderTotal = typeof rawTotal === 'string' ? parseFloat(rawTotal) : Number(rawTotal);
-      const validTotal = isNaN(orderTotal) ? 0 : orderTotal;
-      return sum + validTotal;
-    }, 0)
-  };
 
   // Filter orders based on status, date, and search
   const filteredOrders = orders.filter(order => {
@@ -635,27 +751,56 @@ export default function MainOrders() {
       order.tableNumber?.includes(searchQuery);
 
     let matchesDate = true;
-    if (dateFilter !== "all") {
-      const orderDate = new Date(order.createdAt);
-      const today = new Date();
+    const orderDate = new Date(order.createdAt);
+    const today = new Date();
 
-      switch (dateFilter) {
-        case "today":
-          matchesDate = orderDate.toDateString() === today.toDateString();
-          break;
-        case "week":
-          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-          matchesDate = orderDate >= weekAgo;
-          break;
-        case "month":
-          const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-          matchesDate = orderDate >= monthAgo;
-          break;
+    if (datePickerType === "jalali") {
+      // Jalali date range filtering
+      if (jalaliDateRange.from) {
+        const fromDate = new Date(jalaliDateRange.from);
+        if (orderDate < fromDate) matchesDate = false;
+      }
+      if (jalaliDateRange.to) {
+        const toDate = new Date(jalaliDateRange.to);
+        toDate.setHours(23, 59, 59, 999); // Include entire day
+        if (orderDate > toDate) matchesDate = false;
+      }
+    } else {
+      // Quick filters
+      if (dateFilter !== "all") {
+        switch (dateFilter) {
+          case "today":
+            matchesDate = orderDate.toDateString() === today.toDateString();
+            break;
+          case "week":
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            matchesDate = orderDate >= weekAgo;
+            break;
+          case "month":
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+            matchesDate = orderDate >= monthAgo;
+            break;
+        }
       }
     }
 
     return matchesStatus && matchesSearch && matchesDate;
   });
+
+  const orderStats = {
+    total: filteredOrders.filter(o => o.status !== "cancelled").length,
+    pending: filteredOrders.filter(o => o.status === "pending").length,
+    preparing: filteredOrders.filter(o => o.status === "preparing").length,
+    ready: filteredOrders.filter(o => o.status === "ready").length,
+    completed: filteredOrders.filter(o => o.status === "completed").length,
+    cancelled: filteredOrders.filter(o => o.status === "cancelled").length,
+    todayRevenue: todayOrders.reduce((sum, o) => {
+      const rawTotal = o.totalPrice || 0;
+      const orderTotal = typeof rawTotal === 'string' ? parseFloat(rawTotal) : Number(rawTotal);
+      const validTotal = isNaN(orderTotal) ? 0 : orderTotal;
+      return sum + validTotal;
+    }, 0)
+  };
 
   // Pagination logic
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -666,7 +811,7 @@ export default function MainOrders() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, dateFilter, searchQuery]);
+  }, [statusFilter, dateFilter, searchQuery, jalaliDateRange]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -1168,55 +1313,95 @@ export default function MainOrders() {
 
           {/* Statistics Cards */}
           <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
-            <div className="bg-white rounded-xl p-4 shadow-box">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-800">{orderStats.total}</p>
-                <p className="text-sm text-gray-600">کل سفارشات</p>
+            {/* Total Orders */}
+            <div className="group relative bg-white rounded-2xl p-6 shadow-box hover:shadow-lg transition-all border border-gray-200 hover:border-gray-300 cursor-default">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-gray-200 rounded-full opacity-5 group-hover:opacity-10 -mr-8 -mt-8 transition-opacity"></div>
+              <div className="relative z-10 flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-2">کل سفارشات</p>
+                  <p className="text-3xl font-black text-gray-800">{orderStats.total}</p>
+                  <p className="text-xs text-gray-500 mt-2">سفارش امروز</p>
+                </div>
+                <div className="w-12 h-12 bg-gray-300/20 rounded-xl flex items-center justify-center">
+                  <i className="mt-1.5 fi fi-rr-list text-gray-600 text-lg"></i>
+                </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-box">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-orange-600">{orderStats.pending}</p>
-                <p className="text-sm text-gray-600">در انتظار</p>
+
+            {/* Pending Orders */}
+            <div className="group relative bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl p-6 shadow-box hover:shadow-lg transition-all border border-orange-200 hover:border-orange-300 cursor-default">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-orange-300 rounded-full opacity-5 group-hover:opacity-10 -mr-8 -mt-8 transition-opacity"></div>
+              <div className="relative z-10 flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-orange-700 uppercase tracking-widest mb-2">در انتظار</p>
+                  <p className="text-3xl font-black text-orange-600">{orderStats.pending}</p>
+                  <p className="text-xs text-orange-600 mt-2">نیاز به پردازش</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-300/20 rounded-xl flex items-center justify-center">
+                  <i className="mt-1.5 fi fi-rr-clock text-orange-600 text-lg"></i>
+                </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-box">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600">{orderStats.preparing}</p>
-                <p className="text-sm text-gray-600">در حال آماده‌سازی</p>
+
+            {/* Preparing Orders */}
+            <div className="group relative bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 shadow-box hover:shadow-lg transition-all border border-blue-200 hover:border-blue-300 cursor-default">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-300 rounded-full opacity-5 group-hover:opacity-10 -mr-8 -mt-8 transition-opacity"></div>
+              <div className="relative z-10 flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-widest mb-2">در حال آماده‌سازی</p>
+                  <p className="text-3xl font-black text-blue-600">{orderStats.preparing}</p>
+                  <p className="text-xs text-blue-600 mt-2">در آشپزخانه</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-300/20 rounded-xl flex items-center justify-center">
+                  <i className="mt-1.5 fi fi-rr-fire text-blue-600 text-lg"></i>
+                </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-box">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{orderStats.ready}</p>
-                <p className="text-sm text-gray-600">آماده</p>
+
+            {/* Ready Orders */}
+            <div className="group relative bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 shadow-box hover:shadow-lg transition-all border border-green-200 hover:border-green-300 cursor-default">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-green-300 rounded-full opacity-5 group-hover:opacity-10 -mr-8 -mt-8 transition-opacity"></div>
+              <div className="relative z-10 flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-green-700 uppercase tracking-widest mb-2">آماده</p>
+                  <p className="text-3xl font-black text-green-600">{orderStats.ready}</p>
+                  <p className="text-xs text-green-600 mt-2">منتظر سرو</p>
+                </div>
+                <div className="w-12 h-12 bg-green-300/20 rounded-xl flex items-center justify-center">
+                  <i className="mt-1.5 fi fi-rr-check-circle text-green-600 text-lg"></i>
+                </div>
               </div>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-box">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-600">{orderStats.completed}</p>
-                <p className="text-sm text-gray-600">تکمیل شده</p>
+
+            {/* Completed Orders */}
+            <div className="group relative bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl p-6 shadow-box hover:shadow-lg transition-all border border-teal-200 hover:border-teal-300 cursor-default">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-teal-300 rounded-full opacity-5 group-hover:opacity-10 -mr-8 -mt-8 transition-opacity"></div>
+              <div className="relative z-10 flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-teal-700 uppercase tracking-widest mb-2">تکمیل شده</p>
+                  <p className="text-3xl font-black text-teal-600">{orderStats.completed}</p>
+                  <p className="text-xs text-teal-600 mt-2">پرداخت شده</p>
+                </div>
+                <div className="w-12 h-12 bg-teal-300/20 rounded-xl flex items-center justify-center">
+                  <i className="mt-1.5 fi fi-rr-check text-teal-600 text-lg"></i>
+                </div>
               </div>
             </div>
-            {/* <div className="bg-white rounded-xl p-4 shadow-box">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-teal-600">{formatPrice(orderStats.todayRevenue)}</p>
-              <p className="text-sm text-gray-600">درآمد امروز</p>
-            </div>
-          </div> */}
           </div>
 
           {/* Filters and Search */}
-          <div className="bg-white rounded-2xl p-4 xl:p-6 shadow-box">
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
-              {/* Search */}
-              <div className="xl:col-span-2">
+          <div className="bg-gradient-to-r from-white to-gray-50 rounded-2xl p-4 shadow-box border border-gray-200">
+            {/* Main Filter Row */}
+            <div className="flex flex-col xl:flex-row xl:items-end gap-4">
+              {/* Search Bar */}
+              <div className="flex-1 min-w-0">
+                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">جستجو</label>
                 <div className="relative">
-                  <i className="fi fi-rr-search absolute right-4 top-1/2 mt-0.5 transform -translate-y-1/2 text-gray-400"></i>
+                  <i className="fi fi-rr-search absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-400 text-sm"></i>
                   <input
                     type="text"
-                    placeholder="جستجو در شماره سفارش، نام مشتری یا شماره میز..."
-                    className="w-full pr-12 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    placeholder="سفارش، مشتری یا میز..."
+                    className="w-full pr-10 pl-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all text-sm placeholder-gray-400"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -1224,35 +1409,72 @@ export default function MainOrders() {
               </div>
 
               {/* Status Filter */}
-              <div>
+              <div className="w-full xl:w-48">
+                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">وضعیت</label>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all text-sm font-medium"
                 >
                   <option value="all">همه وضعیت‌ها</option>
-                  <option value="pending">در انتظار</option>
-                  <option value="preparing">در حال آماده‌سازی</option>
-                  <option value="ready">آماده</option>
-                  <option value="completed">تکمیل شده</option>
-                  <option value="cancelled">لغو شده</option>
+                  <option value="pending">⏳ در انتظار</option>
+                  <option value="preparing">🔥 در حال آماده‌سازی</option>
+                  <option value="ready">✓ آماده</option>
+                  <option value="completed">✓✓ تکمیل شده</option>
+                  <option value="cancelled">✕ لغو شده</option>
                 </select>
               </div>
 
-              {/* Date Filter */}
-              <div>
+              {/* Date Filter Type Toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDatePickerType("quick")}
+                  className={`px-3 py-2.5 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${datePickerType === "quick"
+                    ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md"
+                    : "border-2 border-gray-200 text-gray-700 hover:border-teal-300 hover:bg-teal-50"
+                    }`}
+                >
+                  <i className="fi fi-rr-lightning text-xs"></i>
+                  سریع
+                </button>
+                <button
+                  onClick={() => setDatePickerType("jalali")}
+                  className={`px-3 py-2.5 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-1.5 whitespace-nowrap ${datePickerType === "jalali"
+                    ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md"
+                    : "border-2 border-gray-200 text-gray-700 hover:border-teal-300 hover:bg-teal-50"
+                    }`}
+                >
+                  <i className="fi fi-rr-calendar text-xs"></i>
+                  تقویم
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Date Filter */}
+            {datePickerType === "quick" && (
+              <div className="mt-3">
                 <select
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full xl:w-48 px-3 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all text-sm font-medium"
                 >
                   <option value="all">همه تاریخ‌ها</option>
-                  <option value="today">امروز</option>
-                  <option value="week">هفته گذشته</option>
-                  <option value="month">ماه گذشته</option>
+                  <option value="today">📅 امروز</option>
+                  <option value="week">📆 هفته گذشته</option>
+                  <option value="month">📈 ماه گذشته</option>
                 </select>
               </div>
-            </div>
+            )}
+
+            {/* Jalali Date Picker */}
+            {datePickerType === "jalali" && (
+              <div className="mt-3">
+                <JalaliRangePicker
+                  value={jalaliDateRange}
+                  onChange={(range) => setJalaliDateRange(range)}
+                />
+              </div>
+            )}
           </div>
 
           {/* Orders List */}
@@ -1276,7 +1498,7 @@ export default function MainOrders() {
                         <i className="fi fi-rr-shopping-cart mt-1 text-teal-600 text-xl"></i>
                       </div>
                       <div>
-                        <h3 className="font-bold text-gray-800">#{order.id}</h3>
+                        <h3 className="font-bold text-gray-800">سفارش #{getDisplayOrderNumber(order)}</h3>
                         <p className="text-sm text-gray-500">{order.customerName || "مشتری ناشناس"}</p>
                       </div>
                     </div>
@@ -1329,66 +1551,68 @@ export default function MainOrders() {
             </div>
           ) : (
             /* Table View */
-            <div className="bg-white rounded-2xl shadow-box overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-box overflow-hidden border border-gray-200 transition-all">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="bg-gradient-to-r from-teal-800 to-teal-900 border-b-4 border-teal-500">
                     <tr>
-                      <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">شماره سفارش</th>
-                      <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">مشتری</th>
-                      <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">میز</th>
-                      <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">مبلغ کل</th>
-                      <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">وضعیت</th>
-                      <th className="text-right py-4 px-6 text-sm font-medium text-gray-700">زمان سفارش</th>
-                      <th className="text-center py-4 px-6 text-sm font-medium text-gray-700">عملیات</th>
+                      <th className="text-right py-5 px-6 text-xs font-bold text-white uppercase tracking-widest">شماره سفارش</th>
+                      <th className="text-right py-5 px-6 text-xs font-bold text-white uppercase tracking-widest">مشتری</th>
+                      <th className="text-right py-5 px-6 text-xs font-bold text-white uppercase tracking-widest">میز</th>
+                      <th className="text-right py-5 px-6 text-xs font-bold text-white uppercase tracking-widest">مبلغ کل</th>
+                      <th className="text-right py-5 px-6 text-xs font-bold text-white uppercase tracking-widest">وضعیت</th>
+                      <th className="text-right py-5 px-6 text-xs font-bold text-white uppercase tracking-widest">زمان سفارش</th>
+                      <th className="text-center py-5 px-6 text-xs font-bold text-white uppercase tracking-widest">عملیات</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-gray-100">
                     {paginatedOrders.map((order) => (
-                      <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-6">
+                      <tr key={order.id} className="hover:bg-gradient-to-r hover:from-teal-50 hover:to-cyan-50 transition-all duration-200 group">
+                        <td className="py-5 px-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
-                              <i className="fi fi-rr-shopping-cart mt-1 text-teal-600 text-sm"></i>
+                            <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-xl flex items-center justify-center group-hover:shadow-md transition-all">
+                              <i className="fi fi-rr-shopping-cart mt-1 text-white text-sm"></i>
                             </div>
-                            <span className="font-medium text-gray-800">#{order.id}</span>
+                            <span className="font-bold text-gray-800 text-sm">#{getDisplayOrderNumber(order)}</span>
                           </div>
                         </td>
-                        <td className="py-4 px-6">
-                          <p className="text-gray-800">{order.customerName || "مشتری ناشناس"}</p>
+                        <td className="py-5 px-6">
+                          <p className="text-gray-700 font-medium text-sm">{order.customerName || "مشتری ناشناس"}</p>
                         </td>
-                        <td className="py-4 px-6">
-                          <p className="text-gray-800">{order.tableNumber || "-"}</p>
+                        <td className="py-5 px-6">
+                          <p className="text-gray-700 font-medium text-sm">{order.tableNumber || "-"}</p>
                         </td>
-                        <td className="py-4 px-6">
-                          <p className="font-medium text-gray-800">{formatPrice(order.totalPrice)} تومان</p>
-                          <p className="text-xs text-gray-500">{order.totalItems} قلم</p>
+                        <td className="py-5 px-6">
+                          <div className="flex flex-col gap-1">
+                            <p className="font-bold text-gray-800 text-sm">{formatPrice(order.totalPrice)} تومان</p>
+                            <p className="text-xs text-gray-500 font-medium">{order.totalItems} قلم</p>
+                          </div>
                         </td>
-                        <td className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${getStatusColor(order.status)}`}>
+                        <td className="py-5 px-6">
+                          <span className={`px-4 py-2 rounded-lg text-xs font-bold border-2 ${getStatusColor(order.status)}`}>
                             {getStatusText(order.status)}
                           </span>
                         </td>
-                        <td className="py-4 px-6">
-                          <p className="text-sm text-gray-600">{formatDate(order.createdAt)}</p>
+                        <td className="py-5 px-6">
+                          <p className="text-sm text-gray-600 font-medium">{formatDate(order.createdAt)}</p>
                         </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="py-5 px-6">
+                          <div className="flex items-center justify-center gap-3">
                             <button
                               onClick={() => openOrderModal(order)}
-                              className="p-2 mt-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              className="px-4 py-2 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600 transition-all shadow-sm hover:shadow-md flex items-center gap-2"
                               title="مشاهده جزئیات"
                             >
                               <i className="fi fi-rr-eye text-sm"></i>
+                              مشاهده
                             </button>
                             {order.status !== "completed" && order.status !== "cancelled" && (
                               <button
                                 onClick={() => changeOrderStatus(order.id, order.status)}
-                                className="p-2 border border-teal-600 text-sm text-teal-600 hover:bg-teal-50 rounded-xl transition-colors"
+                                className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-xs font-bold rounded-lg hover:shadow-md transition-all shadow-sm"
                                 title="تغییر وضعیت"
                               >
-                                {order.status === "pending" || order.status === "preparing" ? "آماده شده" :
-                                  order.status === "ready" ? "پرداخت شده" : "تغییر"}
+                                <i className="fi fi-rr-check text-sm"></i>
                               </button>
                             )}
                           </div>
@@ -1403,21 +1627,42 @@ export default function MainOrders() {
 
           {/* Pagination */}
           {filteredOrders.length > 0 && totalPages > 1 && (
-            <div className="bg-white rounded-2xl p-4 shadow-box">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  نمایش {startIndex + 1} تا {Math.min(endIndex, filteredOrders.length)} از {filteredOrders.length} سفارش
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-6 shadow-box border border-gray-200">
+              <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
+                {/* Left: Info */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <i className="fi fi-rr-list text-teal-500 text-xl"></i>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700">نتایج</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {startIndex + 1} - {Math.min(endIndex, filteredOrders.length)} از {filteredOrders.length}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Center: Page Info */}
+                <div className="hidden xl:flex items-center gap-2">
+                  <span className="px-4 py-2 bg-white rounded-lg text-sm font-medium text-gray-700 border border-gray-300 shadow-sm">
+                    صفحه <span className="font-bold text-teal-600">{currentPage}</span> از <span className="font-bold text-teal-600">{totalPages}</span>
+                  </span>
+                </div>
+
+                {/* Right: Navigation */}
                 <div className="flex items-center gap-2">
+                  {/* Previous Button */}
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="p-2.5 rounded-xl border-2 border-gray-300 hover:border-teal-500 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-gray-200 transition-all hover:shadow-md"
+                    title="صفحه قبلی"
                   >
-                    قبلی
+                    <i className="fi fi-rr-arrow-left text-gray-600 hover:text-teal-600 text-sm"></i>
                   </button>
 
-                  <div className="flex items-center gap-1">
+                  {/* Page Numbers */}
+                  <div className="hidden sm:flex items-center gap-1 bg-white rounded-xl p-1 border border-gray-300 shadow-sm">
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       let pageNum;
                       if (totalPages <= 5) {
@@ -1434,9 +1679,9 @@ export default function MainOrders() {
                         <button
                           key={pageNum}
                           onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 py-2 text-sm rounded-lg transition-colors ${currentPage === pageNum
-                              ? 'bg-teal-500 text-white'
-                              : 'border border-gray-300 hover:bg-gray-50'
+                          className={`px-3.5 py-2 text-sm font-semibold rounded-lg transition-all ${currentPage === pageNum
+                            ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md'
+                            : 'text-gray-700 hover:bg-gray-100 hover:text-teal-600'
                             }`}
                         >
                           {pageNum}
@@ -1445,14 +1690,38 @@ export default function MainOrders() {
                     })}
                   </div>
 
+                  {/* Next Button */}
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="p-2.5 rounded-xl border-2 border-gray-300 hover:border-teal-500 hover:bg-teal-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:border-gray-200 transition-all hover:shadow-md"
+                    title="صفحه بعدی"
                   >
-                    بعدی
+                    <i className="fi fi-rr-arrow-right text-gray-600 hover:text-teal-600 text-sm"></i>
                   </button>
+
+                  {/* Jump to page (Mobile) */}
+                  <div className="sm:hidden">
+                    <select
+                      value={currentPage}
+                      onChange={(e) => setCurrentPage(parseInt(e.target.value))}
+                      className="px-3 py-2 text-sm font-medium bg-white border-2 border-gray-300 rounded-xl text-gray-700 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-opacity-50"
+                    >
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                        <option key={pageNum} value={pageNum}>
+                          صفحه {pageNum}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+              </div>
+
+              {/* Mobile: Page Info */}
+              <div className="xl:hidden mt-4 pt-4 border-t border-gray-300">
+                <p className="text-center text-sm text-gray-600">
+                  صفحه <span className="font-bold text-teal-600">{currentPage}</span> از <span className="font-bold text-teal-600">{totalPages}</span>
+                </p>
               </div>
             </div>
           )}
@@ -1465,260 +1734,453 @@ export default function MainOrders() {
         </button>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl max-h-[90vh] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-300">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-teal-50 to-blue-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-teal-500 rounded-xl flex items-center justify-center">
-                    <i className="fi fi-rr-plus mt-2 text-white text-lg"></i>
+            <div className="w-full max-w-7xl bg-white rounded-3xl shadow-2xl max-h-[95vh] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-300 flex flex-col">
+              {/* Modal Header - Sticky */}
+              <div className="sticky top-0 z-10 flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-teal-500 to-cyan-500 shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                    <i className="fi fi-rr-shopping-cart text-white text-2xl mt-1"></i>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-800">سفارش جدید</h2>
-                    <p className="text-sm text-gray-600">افزودن سفارش جدید به سیستم</p>
+                    <h2 className="text-2xl font-bold text-white">سفارش جدید</h2>
+                    <p className="text-teal-100 text-sm">افزودن سفارش جدید به سیستم</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors"
+                  className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
                 >
-                  <i className="fi fi-rr-cross mt-1 text-gray-600 text-sm"></i>
+                  <i className="fi fi-rr-cross text-white text-lg"></i>
                 </button>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                {/* Order Details Section */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">اطلاعات سفارش</h3>
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        نام مشتری
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <i className="fi fi-rr-user absolute right-3 mt-0.5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                          <input
-                            type="text"
-                            name="customer"
-                            value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
-                            className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            placeholder="نام مشتری (اختیاری)"
-                          />
+              {/* Modal Content - Scrollable */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  {/* Customer & Table Info Row */}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    {/* Customer Selection */}
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-6 border border-blue-200">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                          <i className="fi fi-rr-user text-white text-sm"></i>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setIsCustomerModalOpen(true)}
-                          className="px-4 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors flex items-center gap-2"
-                        >
-                          <i className="fi fi-rr-list text-sm mt-0.5"></i>
-                          انتخاب
-                        </button>
+                        <label className="text-sm font-bold text-blue-900">اطلاعات مشتری</label>
                       </div>
-                      {selectedCustomer && (
-                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-center justify-between">
-                          <div>
-                            <i className="fi fi-rr-user mr-2"></i>
-                            {selectedCustomer.name} - {selectedCustomer.phone}
-                          </div>
-                          {selectedCustomer.discount_type && selectedCustomer.discount_value ? (
-                            <div className="flex items-center gap-2">
-                              <label className="flex items-center gap-1 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  className="rounded"
-                                  checked={applyCustomerDiscount}
-                                  onChange={(e) => setApplyCustomerDiscount(e.target.checked)}
-                                />
-                                <span>اعمال تخفیف مشتری</span>
-                              </label>
-                              <span className="font-bold">
-                                {selectedCustomer.discount_type === 'percent'
-                                  ? `${selectedCustomer.discount_value}%`
-                                  : `${formatPrice(selectedCustomer.discount_value)} تومان`}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-blue-600">بدون تخفیف پیش‌فرض</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        شماره میز
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <i className="fi fi-rr-table absolute right-3 mt-0.5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                          <input
-                            type="text"
-                            name="table"
-                            value={tableNumber}
-                            onChange={(e) => setTableNumber(e.target.value)}
-                            className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                            placeholder="شماره میز (اختیاری)"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setIsTableModalOpen(true)}
-                          className="px-4 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors flex items-center gap-2"
-                        >
-                          <i className="fi fi-rr-list mt-1 text-sm"></i>
-                          انتخاب
-                        </button>
-                      </div>
-                      {selectedTable && (
-                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                          <p className="text-sm text-green-800">
-                            <i className="fi fi-rr-table mr-2"></i>
-                            میز {selectedTable.table_number} - ظرفیت {selectedTable.capacity} نفر
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                {/* Menu Items Section */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">انتخاب اقلام منو</h3>
-
-                  {/* Search */}
-                  <div className="mb-4">
-                    <div className="relative">
-                      <i className="fi fi-rr-search absolute mt-0.5 right-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                      <input
-                        type="text"
-                        name="search"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                        placeholder="جستجو در منو..."
-                      />
-                    </div>
-                  </div>
-
-                  {/* Categories */}
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">دسته‌بندی‌ها</h4>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setSelectedCategoryId(null)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedCategoryId === null
-                            ? "bg-teal-500 text-white"
-                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                      >
-                        همه
-                      </button>
-                      {categories.map((category) => (
-                        <button
-                          key={category.id}
-                          onClick={() => setSelectedCategoryId(category.id)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedCategoryId === category.id
-                              ? "bg-teal-500 text-white"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                            }`}
-                        >
-                          {category.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Menu Items Grid */}
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-16">
-                    {filteredItems.map((item) => (
-                      <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-4">
-                          <div className="relative">
-                            {item.image ? (
-                              <Image
-                                width={80}
-                                height={80}
-                                src={item.image}
-                                alt={item.name}
-                                className="rounded-xl w-20 h-20 object-cover"
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-800 mb-2 uppercase tracking-wide">نام مشتری</label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <i className="fi fi-rr-user absolute right-3 top-1/2 transform -translate-y-1/2 text-blue-400"></i>
+                              <input
+                                type="text"
+                                value={customerName}
+                                onChange={(e) => setCustomerName(e.target.value)}
+                                className="w-full pr-10 pl-4 py-2.5 bg-white border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                                placeholder="نام مشتری (اختیاری)"
                               />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setIsCustomerModalOpen(true)}
+                              className="px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all flex items-center gap-2 font-medium shadow-sm hover:shadow-md text-sm"
+                              title="انتخاب از لیست مشتریان"
+                            >
+                              <i className="fi fi-rr-list text-sm"></i>
+                              انتخاب
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Selected Customer Info */}
+                        {selectedCustomer && (
+                          <div className="p-3 bg-blue-500/10 border border-blue-400/30 rounded-xl">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <p className="text-sm font-bold text-blue-900">{selectedCustomer.name}</p>
+                                <p className="text-xs text-blue-700">{selectedCustomer.phone}</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setSelectedCustomer(null);
+                                  setCustomerName("");
+                                  setCustomerDiscount(null);
+                                }}
+                                className="text-blue-600 hover:text-blue-800 transition-colors"
+                              >
+                                <i className="fi fi-rr-cross text-sm"></i>
+                              </button>
+                            </div>
+
+                            {/* Customer Discount */}
+                            {selectedCustomer.discount_type && selectedCustomer.discount_value > 0 ? (
+                              <div className="mt-3 p-2.5 bg-green-100 border border-green-300 rounded-lg">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    className="rounded accent-green-600"
+                                    checked={applyCustomerDiscount}
+                                    onChange={(e) => setApplyCustomerDiscount(e.target.checked)}
+                                  />
+                                  <span className="text-xs font-semibold text-green-900">اعمال تخفیف مشتری</span>
+                                </label>
+                                <p className="text-xs text-green-800 mt-1 font-bold">
+                                  {selectedCustomer.discount_type === 'percent'
+                                    ? `${selectedCustomer.discount_value}% تخفیف`
+                                    : `${formatPrice(selectedCustomer.discount_value)} تومان تخفیف`}
+                                </p>
+                              </div>
                             ) : (
-                              <div className="min-w-[80px] min-h-[80px] p-4 bg-gray-200 rounded-2xl flex items-center justify-center">
-                                <span className="text-gray-400 text-sm">
-                                  بدون تصویر
-                                </span>
-                              </div>
-                            )}
-                            {getItemQuantity(item.id) > 0 && (
-                              <div className="absolute -top-2 -right-2 w-6 h-6 bg-teal-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                                {getItemQuantity(item.id)}
-                              </div>
+                              <p className="text-xs text-blue-600">تخفیف پیش‌فرض وجود ندارد</p>
                             )}
                           </div>
-                          <div className="flex-1">
-                            <h4 className="font-medium text-gray-800 mb-1">{item.name}</h4>
-                            <p className="text-sm text-gray-600 mb-3">{formatPrice(item.price)} تومان</p>
-                            <div className="flex items-center gap-2">
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Table Selection */}
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 border border-green-200">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                          <i className="fi fi-rr-table text-white text-sm"></i>
+                        </div>
+                        <label className="text-sm font-bold text-green-900">اطلاعات میز</label>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-green-800 mb-2 uppercase tracking-wide">شماره میز</label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <i className="fi fi-rr-table absolute right-3 top-1/2 transform -translate-y-1/2 text-green-400"></i>
+                              <input
+                                type="text"
+                                value={tableNumber}
+                                onChange={(e) => setTableNumber(e.target.value)}
+                                className="w-full pr-10 pl-4 py-2.5 bg-white border border-green-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all text-sm"
+                                placeholder="شماره میز (اختیاری)"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setIsTableModalOpen(true)}
+                              className="px-4 py-2.5 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-all flex items-center gap-2 font-medium shadow-sm hover:shadow-md text-sm"
+                              title="انتخاب از لیست میزها"
+                            >
+                              <i className="fi fi-rr-list text-sm"></i>
+                              انتخاب
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Selected Table Info */}
+                        {selectedTable && (
+                          <div className="p-3 bg-green-500/10 border border-green-400/30 rounded-xl">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <p className="text-sm font-bold text-green-900">میز {selectedTable.table_number}</p>
+                                <p className="text-xs text-green-700">ظرفیت: {selectedTable.capacity} نفر</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setSelectedTable(null);
+                                  setTableNumber("");
+                                }}
+                                className="text-green-600 hover:text-green-800 transition-colors"
+                              >
+                                <i className="fi fi-rr-cross text-sm"></i>
+                              </button>
+                            </div>
+                            {selectedTable.description && (
+                              <p className="text-xs text-green-700 mt-1">{selectedTable.description}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu Section */}
+                  <div className="border-t border-gray-200 pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
+                          <i className="fi fi-rr-menu text-white text-sm"></i>
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">انتخاب محصولات</h3>
+                      </div>
+                      {Object.values(itemQuantities).length > 0 && (
+                        <div className="px-3 py-1 bg-teal-100 text-teal-700 text-xs font-bold rounded-full">
+                          {Object.values(itemQuantities).length} محصول انتخاب شده
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Search & Categories */}
+                    <div className="space-y-4 mb-4">
+                      {/* Search Bar */}
+                      <div className="relative">
+                        <i className="fi fi-rr-search absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 mt-0.5"></i>
+                        <input
+                          type="text"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full pr-12 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all placeholder-gray-400"
+                          placeholder="جستجو در محصولات..."
+                        />
+                      </div>
+
+                      {/* Categories */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 mb-3 uppercase">دسته‌بندی‌ها</p>
+                        <div className="flex flex-wrap gap-2">
+                          {favoriteItems.length > 0 && (
+                            <button
+                              onClick={() => setSelectedCategoryId(-1)}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${selectedCategoryId === -1
+                                ? "bg-yellow-500 text-white shadow-lg"
+                                : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                                }`}
+                            >
+                              <i className="fi fi-rr-star text-sm"></i>
+                              پرفروش‌ترین
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setSelectedCategoryId(null)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedCategoryId === null
+                              ? "bg-teal-500 text-white shadow-lg"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                              }`}
+                          >
+                            همه
+                          </button>
+                          {categories.map((category) => (
+                            <button
+                              key={category.id}
+                              onClick={() => setSelectedCategoryId(category.id)}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedCategoryId === category.id
+                                ? "bg-teal-500 text-white shadow-lg"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                }`}
+                            >
+                              {category.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Most Used Items (if favorites exist) */}
+                    {selectedCategoryId === -1 && favoriteItems.length > 0 && (
+                      <div className="mt-6 mb-6">
+                        <h4 className="text-sm font-bold text-gray-900 mb-3">آیتم‌های پرفروش‌ترین</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                          {items
+                            .filter((item) => favoriteItems.includes(item.id))
+                            .map((item) => (
+                              <div
+                                key={item.id}
+                                className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-300 rounded-2xl overflow-hidden hover:shadow-lg transition-all group"
+                              >
+                                {/* Item Image */}
+                                <div className="relative h-32 bg-gray-100 overflow-hidden group-hover:bg-gray-200 transition-colors">
+                                  {item.image ? (
+                                    <Image
+                                      width={200}
+                                      height={200}
+                                      src={item.image}
+                                      alt={item.name}
+                                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <i className="fi fi-rr-camera text-3xl text-gray-300"></i>
+                                    </div>
+                                  )}
+                                  <div className="absolute top-2 left-2 bg-yellow-400 text-yellow-900 rounded-full p-1.5 shadow-lg">
+                                    <i className="fi fi-rr-star text-sm"></i>
+                                  </div>
+                                  {getItemQuantity(item.id) > 0 && (
+                                    <div className="absolute -top-1 -left-1 w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
+                                      {getItemQuantity(item.id)}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Item Info */}
+                                <div className="p-3">
+                                  <h4 className="font-bold text-gray-900 text-sm mb-1 line-clamp-2">
+                                    {item.name}
+                                  </h4>
+                                  <p className="text-teal-600 font-bold text-sm mb-3">
+                                    {formatPrice(item.price)} تومان
+                                  </p>
+
+                                  {/* Quantity Controls */}
+                                  {getItemQuantity(item.id) === 0 ? (
+                                    <button
+                                      onClick={() => addItem(item.id)}
+                                      className="w-full px-3 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-lg text-sm font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 hover:scale-105 active:scale-95"
+                                    >
+                                      <i className="fi fi-rr-plus mt-0.5 text-xs"></i>
+                                      افزودن
+                                    </button>
+                                  ) : (
+                                    <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                                      <button
+                                        onClick={() => decreaseQuantity(item.id)}
+                                        className="flex-1 py-1.5 rounded-md bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold text-sm"
+                                      >
+                                        −
+                                      </button>
+                                      <span className="flex-1 text-center font-bold text-gray-800 text-sm">
+                                        {getItemQuantity(item.id)}
+                                      </span>
+                                      <button
+                                        onClick={() => increaseQuantity(item.id)}
+                                        className="flex-1 py-1.5 rounded-md bg-green-100 text-green-600 hover:bg-green-200 transition-colors font-bold text-sm"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Menu Items Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                      {filteredItems.length === 0 ? (
+                        <div className="col-span-full py-12 text-center">
+                          <i className="fi fi-rr-search text-4xl text-gray-300 mb-3"></i>
+                          <p className="text-gray-500">محصولی یافت نشد</p>
+                        </div>
+                      ) : (
+                        filteredItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-teal-300 transition-all group relative"
+                          >
+                            {/* Star Button */}
+                            <button
+                              onClick={() => toggleFavorite(item.id)}
+                              className={`absolute top-2 left-2 z-10 w-8 h-8 rounded-full flex items-center justify-center transition-all ${isFavorite(item.id)
+                                ? "bg-yellow-400 text-yellow-900 shadow-lg scale-110"
+                                : "bg-white/80 text-gray-400 hover:bg-yellow-100 hover:text-yellow-500 shadow-md"
+                                }`}
+                              title={isFavorite(item.id) ? "حذف از پرفروش‌ترین" : "افزودن به پرفروش‌ترین"}
+                            >
+                              <i className={`fi ${isFavorite(item.id) ? "fi-sr-star" : "fi-rr-star"} text-sm mt-1`}></i>
+                            </button>
+
+                            {/* Item Image */}
+                            <div className="relative h-32 bg-gray-100 overflow-hidden group-hover:bg-gray-200 transition-colors">
+                              {item.image ? (
+                                <Image
+                                  width={200}
+                                  height={200}
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <i className="fi fi-rr-camera text-3xl text-gray-300"></i>
+                                </div>
+                              )}
+                              {getItemQuantity(item.id) > 0 && (
+                                <div className="absolute -top-1 -left-1 w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
+                                  {getItemQuantity(item.id)}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Item Info */}
+                            <div className="p-3">
+                              <h4 className="font-bold text-gray-900 text-sm mb-1 line-clamp-2">
+                                {item.name}
+                              </h4>
+                              <p className="text-teal-600 font-bold text-sm mb-3">
+                                {formatPrice(item.price)} تومان
+                              </p>
+
+                              {/* Quantity Controls */}
                               {getItemQuantity(item.id) === 0 ? (
                                 <button
                                   onClick={() => addItem(item.id)}
-                                  className="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors flex items-center gap-2"
+                                  className="w-full px-3 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-lg text-sm font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 hover:scale-105 active:scale-95"
                                 >
                                   <i className="fi fi-rr-plus mt-0.5 text-xs"></i>
                                   افزودن
                                 </button>
                               ) : (
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                                   <button
                                     onClick={() => decreaseQuantity(item.id)}
-                                    className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-colors"
+                                    className="flex-1 py-1.5 rounded-md bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold text-sm"
                                   >
-                                    <i className="fi fi-rr-minus mt-0.5 text-xs"></i>
+                                    −
                                   </button>
-                                  <span className="text-lg font-bold text-gray-800 min-w-[30px] text-center">
+                                  <span className="flex-1 text-center font-bold text-gray-800 text-sm">
                                     {getItemQuantity(item.id)}
                                   </span>
                                   <button
                                     onClick={() => increaseQuantity(item.id)}
-                                    className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200 transition-colors"
+                                    className="flex-1 py-1.5 rounded-md bg-green-100 text-green-600 hover:bg-green-200 transition-colors font-bold text-sm"
                                   >
-                                    <i className="fi fi-rr-plus text-xs"></i>
+                                    +
                                   </button>
                                 </div>
                               )}
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Modal Footer - Sticky */}
-              <div className="sticky bottom-0 border-t border-gray-200 p-6 bg-gray-50 shadow-lg">
+              <div className="sticky bottom-0 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-6 shadow-xl">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-700 space-y-1">
-                    <div>اقلام: {Object.values(itemQuantities).reduce((sum, qty) => sum + qty, 0)} قلم</div>
-                    <div>جمع اولیه: <span className="font-bold">{formatPrice(rawOrderTotal)} تومان</span></div>
+                  {/* Summary */}
+                  <div className="space-y-2">
+                    <div className="text-sm text-gray-700">
+                      <span className="font-semibold">محصولات:</span> <span className="font-bold text-lg text-gray-900">{Object.values(itemQuantities).reduce((sum, qty) => sum + qty, 0)}</span> قلم
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <span className="font-semibold">قیمت پایه:</span> <span className="font-bold text-gray-900">{formatPrice(rawOrderTotal)} تومان</span>
+                    </div>
                     {applyCustomerDiscount && computedDiscountAmount > 0 && (
-                      <div className="text-green-700">تخفیف: <span className="font-bold">- {formatPrice(computedDiscountAmount)} تومان</span></div>
+                      <div className="text-sm text-green-700">
+                        <span className="font-semibold">تخفیف:</span> <span className="font-bold">− {formatPrice(computedDiscountAmount)} تومان</span>
+                      </div>
                     )}
-                    <div>قابل پرداخت: <span className="font-extrabold text-gray-900">{formatPrice(finalOrderTotal)} تومان</span></div>
+                    <div className="text-lg font-bold text-teal-700 pt-2 border-t border-gray-300">
+                      جمع کل: <span className="text-2xl text-teal-600">{formatPrice(finalOrderTotal)}</span> تومان
+                    </div>
                   </div>
+
+                  {/* Buttons */}
                   <div className="flex gap-3">
                     <button
                       onClick={() => setIsModalOpen(false)}
-                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
                     >
                       انصراف
                     </button>
                     <button
                       onClick={handleSubmitOrder}
                       disabled={Object.keys(itemQuantities).length === 0}
-                      className="px-6 py-3 bg-teal-500 text-white rounded-xl hover:bg-teal-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-8 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-xl hover:shadow-lg transition-all disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed flex items-center gap-2 font-bold disabled:opacity-50"
                     >
-                      <i className="fi fi-rr-check mt-1 text-sm"></i>
-                      ثبت سفارش
+                      <i className="fi fi-rr-check mt-0.5 text-lg"></i>
+                      تأیید سفارش
                     </button>
                   </div>
                 </div>
@@ -1730,343 +2192,455 @@ export default function MainOrders() {
         {/* Order Details Modal */}
         {isOrderModalOpen && selectedOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl max-h-[90vh] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-300">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
-                    <i className="fi fi-rr-shopping-cart mt-2 text-white text-lg"></i>
+            <div className="w-full max-w-7xl bg-white rounded-3xl shadow-2xl max-h-[95vh] overflow-hidden animate-in fade-in-0 zoom-in-95 duration-300 flex flex-col">
+              {/* Modal Header - Premium Gradient */}
+              <div className="sticky top-0 z-10 flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-teal-500 to-cyan-500 shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                    <i className="fi fi-rr-shopping-cart text-white text-2xl mt-1"></i>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-800">
-                      جزئیات سفارش #{selectedOrder.id}
+                    <h2 className="text-2xl font-bold text-white">
+                      سفارش #{getDisplayOrderNumber(selectedOrder)}
                     </h2>
-                    <p className="text-sm text-gray-600">مشاهده و مدیریت سفارش</p>
+                    <p className="text-teal-100 text-sm">مشاهده و مدیریت جزئیات سفارش</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handlePrintReceipt}
-                    className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
+                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
                     title="چاپ رسید"
                   >
-                    <i className="fi fi-rr-print text-gray-600 text-base mt-1.5"></i>
+                    <i className="fi fi-rr-print text-white text-lg mt-1"></i>
                   </button>
                   <button
                     onClick={closeOrderModal}
-                    className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors"
+                    className="w-10 h-10 bg-white/20 hover:bg-white/30 rounded-xl flex items-center justify-center transition-colors backdrop-blur-sm"
                   >
-                    <i className="fi fi-rr-cross text-gray-600 text-sm"></i>
+                    <i className="fi fi-rr-cross text-white text-lg"></i>
                   </button>
                 </div>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              {/* Modal Content - Scrollable */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="p-6 space-y-6">
 
-                {/* Order Info Cards */}
-                <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                        <i className="fi fi-rr-user mt-1 text-white text-sm"></i>
-                      </div>
-                      <div>
-                        <p className="text-xs text-blue-600 font-medium">مشتری</p>
-                        <p className="text-sm font-bold text-blue-800">
-                          {selectedOrder.customerName || "مشتری ناشناس"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                        <i className="fi fi-rr-table mt-1 text-white text-sm"></i>
-                      </div>
-                      <div>
-                        <p className="text-xs text-green-600 font-medium">میز</p>
-                        <p className="text-sm font-bold text-green-800">
-                          {selectedOrder.tableNumber || "-"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                        <i className="fi fi-rr-money mt-1 text-white text-sm"></i>
-                      </div>
-                      <div>
-                        <p className="text-xs text-purple-600 font-medium">مبلغ کل</p>
-                        <p className="text-sm font-bold text-purple-800">
-                          {formatPrice(selectedOrder.totalPrice)} تومان
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
-                        <i className="fi fi-rr-clock mt-1 text-white text-sm"></i>
-                      </div>
-                      <div>
-                        <p className="text-xs text-orange-600 font-medium">وضعیت</p>
-                        <div className={`px-2 py-1 rounded-lg text-xs font-bold ${getStatusColor(selectedOrder.status)}`}>
-                          {getStatusText(selectedOrder.status)}
+                  {/* Order Info Cards */}
+                  <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                          <i className="fi fi-rr-user mt-1 text-white text-sm"></i>
+                        </div>
+                        <div>
+                          <p className="text-xs text-blue-600 font-medium">مشتری</p>
+                          <p className="text-sm font-bold text-blue-800">
+                            {selectedOrder.customerName || "مشتری ناشناس"}
+                          </p>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Current Order Items */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">اقلام سفارش</h3>
-                  <div className="space-y-3">
-                    {selectedOrder.items.map((item: any) => (
-                      <div
-                        key={item.order_item_ID}
-                        className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center">
-                              <span className="text-sm font-bold text-teal-700">
-                                {item.quantity}x
-                              </span>
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-800">{item.item_name}</p>
-                              <p className="text-sm text-gray-600">
-                                {formatPrice(item.item_price)} تومان
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={async () => {
-                                // Create new items array with quantity decreased
-                                const newItems = selectedOrder.items.map((orderItem: any) =>
-                                  orderItem.menu_ID === item.menu_ID
-                                    ? { ...orderItem, quantity: orderItem.quantity - 1 }
-                                    : orderItem
-                                ).filter((orderItem: any) => orderItem.quantity > 0);
-                                setSelectedOrder((prev: any) => ({ ...prev, items: newItems }));
-                                await applyOrderChanges(false, newItems);
-                              }}
-                              className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-colors"
-                            >
-                              <i className="fi fi-rr-minus text-xs"></i>
-                            </button>
-                            <span className="text-lg font-bold text-gray-800 min-w-[30px] text-center">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={async () => {
-                                // Create new items array with quantity increased
-                                const newItems = selectedOrder.items.map((orderItem: any) =>
-                                  orderItem.menu_ID === item.menu_ID
-                                    ? { ...orderItem, quantity: orderItem.quantity + 1 }
-                                    : orderItem
-                                );
-                                setSelectedOrder((prev: any) => ({ ...prev, items: newItems }));
-                                await applyOrderChanges(false, newItems);
-                              }}
-                              className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200 transition-colors"
-                            >
-                              <i className="fi fi-rr-plus text-xs"></i>
-                            </button>
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                          <i className="fi fi-rr-table mt-1 text-white text-sm"></i>
+                        </div>
+                        <div>
+                          <p className="text-xs text-green-600 font-medium">میز</p>
+                          <p className="text-sm font-bold text-green-800">
+                            {selectedOrder.tableNumber || "-"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                          <i className="fi fi-rr-money mt-1 text-white text-sm"></i>
+                        </div>
+                        <div>
+                          <p className="text-xs text-purple-600 font-medium">مبلغ کل</p>
+                          <p className="text-sm font-bold text-purple-800">
+                            {formatPrice(selectedOrder.totalPrice)} تومان
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center">
+                          <i className="fi fi-rr-clock mt-1 text-white text-sm"></i>
+                        </div>
+                        <div>
+                          <p className="text-xs text-orange-600 font-medium">وضعیت</p>
+                          <div className={`px-2 py-1 rounded-lg text-xs font-bold ${getStatusColor(selectedOrder.status)}`}>
+                            {getStatusText(selectedOrder.status)}
                           </div>
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Add New Items */}
-                <div className="mb-16">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">افزودن آیتم جدید</h3>
-                  <div className="relative mb-4">
-                    <i className="fi fi-rr-search absolute right-3 mt-0.5 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    <input
-                      type="text"
-                      value={orderModalSearchTerm}
-                      onChange={(e) => setOrderModalSearchTerm(e.target.value)}
-                      className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="جستجو در منو..."
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                    {items
-                      .filter((item) =>
-                        item.name
-                          .toLowerCase()
-                          .includes(orderModalSearchTerm.toLowerCase())
-                      )
-                      .slice(0, orderModalSearchTerm.trim() === "" ? 6 : 8)
-                      .map((item) => (
+                  {/* Current Order Items */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4">اقلام سفارش</h3>
+                    <div className="space-y-3">
+                      {selectedOrder.items.map((item: any) => (
                         <div
-                          key={item.id}
-                          className="bg-white border border-gray-200 rounded-xl p-3 hover:shadow-md transition-shadow"
+                          key={item.order_item_ID}
+                          className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {item.image ? (
-                                <Image
-                                  width={80}
-                                  height={80}
-                                  src={item.image}
-                                  alt={item.name}
-                                  className="rounded-xl w-20 h-20 object-cover"
-                                />
-                              ) : (
-                                <div className="min-w-[80px] min-h-[80px] p-4 bg-gray-200 rounded-2xl flex items-center justify-center">
-                                  <span className="text-gray-400 text-sm">
-                                    بدون تصویر
-                                  </span>
-                                </div>
-                              )}
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-gradient-to-br from-teal-100 to-teal-200 rounded-lg flex items-center justify-center">
+                                <span className="text-sm font-bold text-teal-700">
+                                  {item.quantity}x
+                                </span>
+                              </div>
                               <div>
-                                <p className="font-medium text-gray-800">{item.name}</p>
+                                <p className="font-medium text-gray-800">{item.item_name}</p>
                                 <p className="text-sm text-gray-600">
-                                  {formatPrice(item.price)} تومان
+                                  {formatPrice(item.item_price)} تومان
                                 </p>
                               </div>
                             </div>
-                            {newItemsToAdd[item.id] ? (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    if (newItemsToAdd[item.id] > 1) {
-                                      setNewItemsToAdd(prev => ({
-                                        ...prev,
-                                        [item.id]: prev[item.id] - 1
-                                      }));
-                                    } else {
-                                      setNewItemsToAdd(prev => {
-                                        const newState = { ...prev };
-                                        delete newState[item.id];
-                                        return newState;
-                                      });
-                                    }
-                                  }}
-                                  className="w-6 h-6 rounded-lg bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-colors"
-                                >
-                                  <i className="fi fi-rr-minus text-xs"></i>
-                                </button>
-                                <span className="text-sm font-bold text-gray-800 min-w-[20px] text-center">
-                                  {newItemsToAdd[item.id]}
-                                </span>
-                                <button
-                                  onClick={() => setNewItemsToAdd(prev => ({
-                                    ...prev,
-                                    [item.id]: (prev[item.id] || 0) + 1
-                                  }))}
-                                  className="w-6 h-6 rounded-lg bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200 transition-colors"
-                                >
-                                  <i className="fi fi-rr-plus text-xs"></i>
-                                </button>
-                              </div>
-                            ) : (
+                            <div className="flex items-center gap-3">
                               <button
-                                onClick={() => setNewItemsToAdd(prev => ({
-                                  ...prev,
-                                  [item.id]: 1
-                                }))}
-                                className="px-3 py-1 bg-teal-500 text-white rounded-lg text-sm font-medium hover:bg-teal-600 transition-colors flex items-center gap-1"
+                                onClick={async () => {
+                                  // Create new items array with quantity decreased
+                                  const newItems = selectedOrder.items.map((orderItem: any) =>
+                                    orderItem.menu_ID === item.menu_ID
+                                      ? { ...orderItem, quantity: orderItem.quantity - 1 }
+                                      : orderItem
+                                  ).filter((orderItem: any) => orderItem.quantity > 0);
+                                  setSelectedOrder((prev: any) => ({ ...prev, items: newItems }));
+                                  await applyOrderChanges(false, newItems);
+                                }}
+                                className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-colors"
+                              >
+                                <i className="fi fi-rr-minus text-xs"></i>
+                              </button>
+                              <span className="text-lg font-bold text-gray-800 min-w-[30px] text-center">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={async () => {
+                                  // Create new items array with quantity increased
+                                  const newItems = selectedOrder.items.map((orderItem: any) =>
+                                    orderItem.menu_ID === item.menu_ID
+                                      ? { ...orderItem, quantity: orderItem.quantity + 1 }
+                                      : orderItem
+                                  );
+                                  setSelectedOrder((prev: any) => ({ ...prev, items: newItems }));
+                                  await applyOrderChanges(false, newItems);
+                                }}
+                                className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200 transition-colors"
                               >
                                 <i className="fi fi-rr-plus text-xs"></i>
-                                افزودن
                               </button>
-                            )}
+                            </div>
                           </div>
                         </div>
                       ))}
-                  </div>
-                </div>
-
-                {/* Submit New Items Section */}
-                {Object.keys(newItemsToAdd).length > 0 && (
-                  <div className="mb-16 p-4 bg-teal-50 border border-teal-200 rounded-xl">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium text-teal-800">آیتم‌های جدید برای افزودن</h4>
-                      <span className="text-sm text-teal-600">
-                        {Object.values(newItemsToAdd).reduce((sum, qty) => sum + qty, 0)} قلم
-                      </span>
-                    </div>
-                    <div className="space-y-2 mb-4">
-                      {Object.entries(newItemsToAdd).map(([itemId, quantity]) => {
-                        const item = items.find(i => i.id === parseInt(itemId));
-                        return item ? (
-                          <div key={itemId} className="flex items-center justify-between text-sm">
-                            <span className="text-gray-700">{item.name}</span>
-                            <span className="font-medium text-teal-700">{quantity}x</span>
+                      {/* Submit New Items Section */}
+                      {Object.keys(newItemsToAdd).length > 0 && (
+                        <div className="mt-6 p-4 bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-2xl">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                              <i className="fi fi-rr-check-circle text-teal-600 text-lg"></i>
+                              <h4 className="font-bold text-teal-900">آیتم‌های انتخاب شده</h4>
+                            </div>
+                            <span className="text-sm font-bold text-teal-600">
+                              {Object.values(newItemsToAdd).reduce((sum, qty) => sum + qty, 0)} قلم
+                            </span>
                           </div>
-                        ) : null;
-                      })}
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => setNewItemsToAdd({})}
-                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                      >
-                        پاک کردن همه
-                      </button>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await applyOrderChanges();
-                            toast.success("آیتم‌های جدید با موفقیت اضافه شدند");
-                          } catch (error) {
-                            toast.error("خطا در افزودن آیتم‌ها");
-                          }
-                        }}
-                        className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors text-sm flex items-center gap-2"
-                      >
-                        <i className="fi fi-rr-check text-xs"></i>
-                        افزودن به سفارش
-                      </button>
+                          <div className="space-y-2 mb-4">
+                            {Object.entries(newItemsToAdd).map(([itemId, quantity]) => {
+                              const item = items.find(i => i.id === parseInt(itemId));
+                              return item ? (
+                                <div key={itemId} className="flex items-center justify-between text-sm">
+                                  <span className="text-gray-800 font-medium">{item.name}</span>
+                                  <span className="font-bold text-teal-700 bg-white px-2 py-1 rounded-lg">{quantity}x</span>
+                                </div>
+                              ) : null;
+                            })}
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => setNewItemsToAdd({})}
+                              className="px-4 py-2 border-2 border-teal-300 text-teal-600 rounded-lg hover:bg-teal-50 transition-colors text-sm font-semibold"
+                            >
+                              پاک کردن همه
+                            </button>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await applyOrderChanges();
+                                  toast.success("آیتم‌های جدید با موفقیت اضافه شدند");
+                                } catch (error) {
+                                  toast.error("خطا در افزودن آیتم‌ها");
+                                }
+                              }}
+                              className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors text-sm flex items-center gap-2"
+                            >
+                              <i className="fi fi-rr-check text-xs"></i>
+                              افزودن به سفارش
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
 
+                  {/* Add New Items - Enhanced Section */}
+                  <div className="border-t border-gray-200 pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-teal-500 rounded-lg flex items-center justify-center">
+                          <i className="fi fi-rr-menu text-white text-sm"></i>
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">افزودن آیتم جدید</h3>
+                      </div>
+                      {Object.values(newItemsToAdd).length > 0 && (
+                        <div className="px-3 py-1 bg-teal-100 text-teal-700 text-xs font-bold rounded-full">
+                          {Object.values(newItemsToAdd).reduce((sum, qty) => sum + qty, 0)} محصول
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Search & Categories */}
+                    <div className="space-y-4 mb-4">
+                      {/* Search Bar */}
+                      <div className="relative">
+                        <i className="fi fi-rr-search absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 mt-0.5"></i>
+                        <input
+                          type="text"
+                          value={orderModalSearchTerm}
+                          onChange={(e) => setOrderModalSearchTerm(e.target.value)}
+                          className="w-full pr-12 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all placeholder-gray-400"
+                          placeholder="جستجو در محصولات..."
+                        />
+                      </div>
+
+                      {/* Categories */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 mb-3 uppercase">دسته‌بندی‌ها</p>
+                        <div className="flex flex-wrap gap-2">
+                          {favoriteItems.length > 0 && (
+                            <button
+                              onClick={() => setOrderModalCategoryId(-1)}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${orderModalCategoryId === -1
+                                ? "bg-yellow-500 text-white shadow-lg"
+                                : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                                }`}
+                            >
+                              <i className="fi fi-rr-star text-sm"></i>
+                              پرفروش‌ترین
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setOrderModalCategoryId(null)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${orderModalCategoryId === null
+                              ? "bg-teal-500 text-white shadow-lg"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                              }`}
+                          >
+                            همه
+                          </button>
+                          {categories.map((category) => (
+                            <button
+                              key={category.id}
+                              onClick={() => setOrderModalCategoryId(category.id)}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${orderModalCategoryId === category.id
+                                ? "bg-teal-500 text-white shadow-lg"
+                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                }`}
+                            >
+                              {category.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu Items Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                      {items
+                        .filter((item) => {
+                          const matchesSearch = orderModalSearchTerm === "" ||
+                            item.name.toLowerCase().includes(orderModalSearchTerm.toLowerCase());
+                          const matchesCategory = orderModalCategoryId === -1
+                            ? favoriteItems.includes(item.id)
+                            : orderModalCategoryId === null
+                              ? true
+                              : Number(item.categoryId) === orderModalCategoryId;
+                          return matchesSearch && matchesCategory;
+                        })
+                        .map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-teal-300 transition-all group"
+                          >
+                            {/* Item Image */}
+                            <div className="relative h-32 bg-gray-100 overflow-hidden group-hover:bg-gray-200 transition-colors">
+                              {item.image ? (
+                                <Image
+                                  width={200}
+                                  height={200}
+                                  src={item.image}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <i className="fi fi-rr-camera text-3xl text-gray-300"></i>
+                                </div>
+                              )}
+                              {newItemsToAdd[item.id] && (
+                                <div className="absolute -top-1 -left-1 w-8 h-8 bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg">
+                                  {newItemsToAdd[item.id]}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Item Info */}
+                            <div className="p-3">
+                              <h4 className="font-bold text-gray-900 text-sm mb-1 line-clamp-2">
+                                {item.name}
+                              </h4>
+                              <p className="text-teal-600 font-bold text-sm mb-3">
+                                {formatPrice(item.price)} تومان
+                              </p>
+
+                              {/* Quantity Controls */}
+                              {newItemsToAdd[item.id] ? (
+                                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                                  <button
+                                    onClick={() => {
+                                      if (newItemsToAdd[item.id] > 1) {
+                                        setNewItemsToAdd(prev => ({
+                                          ...prev,
+                                          [item.id]: prev[item.id] - 1
+                                        }));
+                                      } else {
+                                        setNewItemsToAdd(prev => {
+                                          const newState = { ...prev };
+                                          delete newState[item.id];
+                                          return newState;
+                                        });
+                                      }
+                                    }}
+                                    className="flex-1 py-1.5 rounded-md bg-red-100 text-red-600 hover:bg-red-200 transition-colors font-bold text-sm"
+                                  >
+                                    −
+                                  </button>
+                                  <span className="flex-1 text-center font-bold text-gray-800 text-sm">
+                                    {newItemsToAdd[item.id]}
+                                  </span>
+                                  <button
+                                    onClick={() => setNewItemsToAdd(prev => ({
+                                      ...prev,
+                                      [item.id]: (prev[item.id] || 0) + 1
+                                    }))}
+                                    className="flex-1 py-1.5 rounded-md bg-green-100 text-green-600 hover:bg-green-200 transition-colors font-bold text-sm"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setNewItemsToAdd(prev => ({
+                                    ...prev,
+                                    [item.id]: 1
+                                  }))}
+                                  className="w-full px-3 py-2 bg-gradient-to-r from-teal-500 to-teal-600 text-white rounded-lg text-sm font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 hover:scale-105 active:scale-95"
+                                >
+                                  <i className="fi fi-rr-plus mt-0.5 text-xs"></i>
+                                  افزودن
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* Empty State */}
+                    {items.filter((item) => {
+                      const matchesSearch = orderModalSearchTerm === "" ||
+                        item.name.toLowerCase().includes(orderModalSearchTerm.toLowerCase());
+                      const matchesCategory = orderModalCategoryId === -1
+                        ? favoriteItems.includes(item.id)
+                        : orderModalCategoryId === null
+                          ? true
+                          : Number(item.categoryId) === orderModalCategoryId;
+                      return matchesSearch && matchesCategory;
+                    }).length === 0 && (
+                        <div className="col-span-full py-12 text-center">
+                          <i className="fi fi-rr-search text-4xl text-gray-300 mb-3"></i>
+                          <p className="text-gray-500">محصولی یافت نشد</p>
+                        </div>
+                      )}
+                  </div>
+
+                </div>
               </div>
 
-              {/* Modal Footer - Sticky */}
-              <div className="sticky bottom-0 border-t border-gray-200 p-6 bg-gray-50 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    سفارش #{selectedOrder.id} - {selectedOrder.items.length} قلم - {formatPrice(selectedOrder.totalPrice)} تومان
+              {/* Modal Footer - Sticky with Premium Styling */}
+              <div className="sticky bottom-0 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-6 shadow-xl">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Summary Info */}
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-gray-700">
+                      سفارش #{getDisplayOrderNumber(selectedOrder)} - {selectedOrder.items.length} قلم
+                    </p>
+                    <p className="text-lg font-bold text-teal-600">
+                      {formatPrice(selectedOrder.totalPrice)} تومان
+                    </p>
                   </div>
-                  <div className="flex gap-3">
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={closeOrderModal}
-                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
                     >
                       بستن
                     </button>
+
+                    {/* Delete Button - Always Available */}
+                    <button
+                      onClick={deleteOrder}
+                      className="px-6 py-3 border-2 border-red-300 text-red-600 rounded-xl hover:bg-red-50 transition-all font-semibold flex items-center gap-2"
+                      title="حذف سفارش"
+                    >
+                      <i className="fi fi-rr-trash text-sm"></i>
+                      حذف
+                    </button>
+
                     {selectedOrder.status !== "completed" && selectedOrder.status !== "cancelled" && (
-                      <button
-                        onClick={cancelOrder}
-                        className="px-6 py-3 border border-red-300 text-red-600 rounded-xl hover:bg-red-50 transition-colors"
-                      >
-                        لغو سفارش
-                      </button>
-                    )}
-                    {selectedOrder.status !== "completed" && selectedOrder.status !== "cancelled" && (
-                      <button
-                        onClick={() => changeOrderStatus(selectedOrder.id, selectedOrder.status)}
-                        className="px-6 py-3 bg-teal-500 text-white rounded-xl hover:bg-teal-600 transition-colors flex items-center gap-2"
-                      >
-                        <i className="fi fi-rr-check text-sm"></i>
-                        {selectedOrder.status === "pending" ? "شروع آماده‌سازی" :
-                          selectedOrder.status === "preparing" ? "آماده شد" :
-                            selectedOrder.status === "ready" ? "تکمیل سفارش" : ""}
-                      </button>
+                      <>
+                        <button
+                          onClick={cancelOrder}
+                          className="px-6 py-3 border-2 border-orange-300 text-orange-600 rounded-xl hover:bg-orange-50 transition-all font-semibold flex items-center gap-2"
+                        >
+                          <i className="fi fi-rr-cross text-sm"></i>
+                          لغو
+                        </button>
+                        <button
+                          onClick={() => changeOrderStatus(selectedOrder.id, selectedOrder.status)}
+                          className="px-6 py-3 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-semibold"
+                        >
+                          <i className="fi fi-rr-check text-sm"></i>
+                          {selectedOrder.status === "pending" ? "شروع آماده‌سازی" :
+                            selectedOrder.status === "preparing" ? "آماده شد" :
+                              selectedOrder.status === "ready" ? "تکمیل سفارش" : ""}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -2274,8 +2848,8 @@ export default function MainOrders() {
                           setIsTableModalOpen(false);
                         }}
                         className={`p-4 border rounded-xl hover:shadow-md transition-all cursor-pointer ${table.status === 'available'
-                            ? 'border-green-200 hover:bg-green-50'
-                            : 'border-orange-200 hover:bg-orange-50'
+                          ? 'border-green-200 hover:bg-green-50'
+                          : 'border-orange-200 hover:bg-orange-50'
                           }`}
                       >
                         <div className="flex items-center justify-between">
@@ -2295,8 +2869,8 @@ export default function MainOrders() {
                           </div>
                           <div className="text-left">
                             <span className={`px-2 py-1 rounded-lg text-xs font-medium ${table.status === 'available'
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-orange-100 text-orange-700'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-orange-100 text-orange-700'
                               }`}>
                               {table.status === 'available' ? 'آزاد' : 'اشغال'}
                             </span>
