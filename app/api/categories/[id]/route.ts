@@ -1,18 +1,27 @@
-import { NextResponse } from 'next/server';
-import { executeQuery } from '@/lib/dbHelper';
-import { getAuth } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { executeQueryOnUserDB } from '@/lib/dbHelper';
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // GET - Fetch single category
 export async function GET(
-  request: Request
+  request: NextRequest
 ) {
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/categories\/([^/]+)(?:\/)?$/);
     const categoryId = match?.[1];
     
-    const category = await executeQuery(async (connection) => {
+    const category = await executeQueryOnUserDB(dbName, async (connection) => {
       const selectQuery = `
         SELECT 
           category_ID,
@@ -40,7 +49,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching category:', error);
+    console.error('Error fetching category');
     return NextResponse.json(
       { 
         success: false,
@@ -53,13 +62,21 @@ export async function GET(
 
 // PUT - Update category
 export async function PUT(
-  request: Request
+  request: NextRequest
 ) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_categories')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/categories\/([^/]+)(?:\/)?$/);
     const categoryId = match?.[1];
@@ -75,7 +92,7 @@ export async function PUT(
 
     const categoryName = body.name.trim();
 
-    const result = await executeQuery(async (connection) => {
+    const result = await executeQueryOnUserDB(dbName, async (connection) => {
       // Check if category name already exists (excluding current category)
       const checkQuery = `
         SELECT category_ID FROM categories 
@@ -104,11 +121,6 @@ export async function PUT(
       return updateResult;
     });
 
-    console.log('Category updated:', {
-      id: categoryId,
-      name: categoryName
-    });
-
     return NextResponse.json(
       { 
         message: 'دسته‌بندی با موفقیت ویرایش شد',
@@ -121,7 +133,7 @@ export async function PUT(
     );
 
   } catch (error) {
-    console.error('Error updating category:', error);
+    console.error('Error updating category');
     return NextResponse.json(
       { message: 'خطا در پردازش درخواست' },
       { status: 500 }
@@ -131,18 +143,26 @@ export async function PUT(
 
 // DELETE - Delete category
 export async function DELETE(
-  request: Request
+  request: NextRequest
 ) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_categories')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/categories\/([^/]+)(?:\/)?$/);
     const categoryId = match?.[1];
     
-    const result = await executeQuery(async (connection) => {
+    const result = await executeQueryOnUserDB(dbName, async (connection) => {
       // Check if category exists
       const checkQuery = `
         SELECT category_ID FROM categories 
@@ -178,10 +198,6 @@ export async function DELETE(
       return deleteResult;
     });
 
-    console.log('Category deleted:', {
-      id: categoryId
-    });
-
     return NextResponse.json(
       { 
         message: 'دسته‌بندی با موفقیت حذف شد'
@@ -190,7 +206,7 @@ export async function DELETE(
     );
 
   } catch (error) {
-    console.error('Error deleting category:', error);
+    console.error('Error deleting category');
     return NextResponse.json(
       { message: 'خطا در پردازش درخواست' },
       { status: 500 }

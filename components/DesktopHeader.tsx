@@ -12,7 +12,7 @@ export default function DesktopHeader() {
         console.error('Logout failed:', response.statusText);
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Logout error');
     } finally {
       // Always redirect to login page, even if logout API fails
       router.replace('/');

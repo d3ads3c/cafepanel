@@ -1,62 +1,66 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import pool from '@/lib/db';
-import { getAuth } from '@/lib/auth';
+import { executeQueryOnUserDB } from '@/lib/dbHelper';
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // GET - Fetch single menu item
 export async function GET(
-  request: Request
+  request: NextRequest
 ) {
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/menu\/([^/]+)(?:\/)?$/);
     const itemId = match?.[1];
     
-    const connection = await pool.getConnection();
-    
-    const selectQuery = `
-      SELECT 
-        m.menu_ID,
-        m.menu_name,
-        m.menu_info,
-        m.menu_price,
-        m.menu_img,
-        m.menu_category,
-        m.menu_status,
-        c.category_name
-      FROM menu m
-      LEFT JOIN categories c ON m.menu_category = c.category_ID
-      WHERE m.menu_ID = ? AND m.menu_status = 1
-    `;
-    
-    const [rows] = await connection.execute(selectQuery, [itemId]);
-    connection.release();
+    const menuItem = await executeQueryOnUserDB(dbName, async (connection) => {
+      const selectQuery = `
+        SELECT 
+          m.menu_ID,
+          m.menu_name,
+          m.menu_info,
+          m.menu_price,
+          m.menu_img,
+          m.menu_category,
+          m.menu_status,
+          m.menu_show,
+          c.category_name
+        FROM menu m
+        LEFT JOIN categories c ON m.menu_category = c.category_ID
+        WHERE m.menu_ID = ? AND m.menu_status = 1
+      `;
+      
+      const [rows] = await connection.execute(selectQuery, [itemId]);
 
-    if ((rows as any[]).length === 0) {
-      return NextResponse.json(
-        { 
-          success: false,
-          message: 'آیتم مورد نظر یافت نشد' 
-        },
-        { status: 404 }
-      );
-    }
+      if ((rows as any[]).length === 0) {
+        throw { status: 404, message: 'آیتم مورد نظر یافت نشد' };
+      }
 
-    const item = (rows as any[])[0];
-    const menuItem = {
-      id: Number(item.menu_ID),
-      name: item.menu_name ?? '',
-      info: item.menu_info ?? '',
-      price: Number(item.menu_price),
-      image: item.menu_img ?? null,
-      categoryId: item.menu_category === null || item.menu_category === undefined ? null : Number(item.menu_category),
-      categoryName: item.category_name ?? null,
-      status: Number(item.menu_status)
-    };
+      const item = (rows as any[])[0];
+      return {
+        id: Number(item.menu_ID),
+        name: item.menu_name ?? '',
+        info: item.menu_info ?? '',
+        price: Number(item.menu_price),
+        image: item.menu_img ?? null,
+        categoryId: item.menu_category === null || item.menu_category === undefined ? null : Number(item.menu_category),
+        categoryName: item.category_name ?? null,
+        status: Number(item.menu_status),
+        menu_show: item.menu_show !== undefined && item.menu_show !== null ? Number(item.menu_show) : 1
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -64,7 +68,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching menu item:', error);
+    console.error('Error fetching menu item');
     return NextResponse.json(
       { 
         success: false,
@@ -77,20 +81,28 @@ export async function GET(
 
 // PUT - Update menu item
 export async function PUT(
-  request: Request
+  request: NextRequest
 ) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_menu')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/menu\/([^/]+)(?:\/)?$/);
     const itemId = match?.[1];
     const body = await request.json();
     
     // Validate required fields
-    if (!body.name || !body.price || !body.info) {
+    if (!body.name || !body.price) {
       return NextResponse.json(
         { message: 'نام، قیمت و توضیحات الزامی هستند' },
         { status: 400 }
@@ -132,7 +144,6 @@ export async function PUT(
         // Set image path for database storage
         imagePath = `/img/product/${filename}`;
         
-        console.log('New image saved:', imagePath);
       } catch (imageError) {
         console.error('Error saving image:', imageError);
         return NextResponse.json(
@@ -143,120 +154,98 @@ export async function PUT(
     }
 
     // Update data in MariaDB
-    try {
-      const connection = await pool.getConnection();
-      
+    await executeQueryOnUserDB(dbName, async (connection) => {
       let updateQuery: string;
       let values: any[];
+
+      const menuShow = body.menu_show !== undefined ? body.menu_show : 1;
 
       if (imagePath) {
         // Update with new image
         updateQuery = `
           UPDATE menu 
-          SET menu_name = ?, menu_info = ?, menu_price = ?, menu_img = ?, menu_category = ?
+          SET menu_name = ?, menu_info = ?, menu_price = ?, menu_img = ?, menu_category = ?, menu_show = ?
           WHERE menu_ID = ?
         `;
-        values = [body.name, body.info, body.price, imagePath, body.categoryId || null, itemId];
+        values = [body.name, body.info, body.price, imagePath, body.categoryId || null, menuShow, itemId];
       } else {
         // Update without changing image
         updateQuery = `
           UPDATE menu 
-          SET menu_name = ?, menu_info = ?, menu_price = ?, menu_category = ?
+          SET menu_name = ?, menu_info = ?, menu_price = ?, menu_category = ?, menu_show = ?
           WHERE menu_ID = ?
         `;
-        values = [body.name, body.info, body.price, body.categoryId || null, itemId];
+        values = [body.name, body.info, body.price, body.categoryId || null, menuShow, itemId];
       }
 
       const [result] = await connection.execute(updateQuery, values);
-      connection.release();
 
       if ((result as any).affectedRows === 0) {
-        return NextResponse.json(
-          { message: 'آیتم مورد نظر یافت نشد' },
-          { status: 404 }
-        );
+        throw { status: 404, message: 'آیتم مورد نظر یافت نشد' };
       }
+    });
 
-      console.log('Menu item updated:', {
-        id: itemId,
-        name: body.name,
-        price: body.price,
-        info: body.info,
-        image: imagePath
-      });
+    return NextResponse.json(
+      { 
+        message: 'آیتم با موفقیت ویرایش شد',
+        data: {
+          id: itemId,
+          name: body.name,
+          price: body.price,
+          info: body.info,
+          image: imagePath
+        }
+      },
+      { status: 200 }
+    );
 
-      return NextResponse.json(
-        { 
-          message: 'آیتم با موفقیت ویرایش شد',
-          data: {
-            id: itemId,
-            name: body.name,
-            price: body.price,
-            info: body.info,
-            image: imagePath
-          }
-        },
-        { status: 200 }
-      );
-
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { message: 'خطا در ذخیره در پایگاه داده' },
-        { status: 500 }
-      );
-    }
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating menu item:', error);
     return NextResponse.json(
-      { message: 'خطا در پردازش درخواست' },
-      { status: 500 }
+      { message: error.message || 'خطا در پردازش درخواست' },
+      { status: error.status || 500 }
     );
   }
 }
 
 // DELETE - Soft delete menu item (set status to 0)
 export async function DELETE(
-  request: Request
+  request: NextRequest
 ) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_menu')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/menu\/([^/]+)(?:\/)?$/);
     const itemId = match?.[1];
-    const connection = await pool.getConnection();
-    try {
+
+    await executeQueryOnUserDB(dbName, async (connection) => {
       const [result] = await connection.execute(
         `UPDATE menu SET menu_status = 0 WHERE menu_ID = ?`,
         [itemId]
       );
-      connection.release();
 
       if ((result as any).affectedRows === 0) {
-        return NextResponse.json(
-          { message: 'آیتم مورد نظر یافت نشد' },
-          { status: 404 }
-        );
+        throw { status: 404, message: 'آیتم مورد نظر یافت نشد' };
       }
+    });
 
-      return NextResponse.json({ success: true, message: 'آیتم حذف شد' });
-    } catch (dbError) {
-      connection.release();
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { message: 'خطا در حذف آیتم' },
-        { status: 500 }
-      );
-    }
-  } catch (error) {
+    return NextResponse.json({ success: true, message: 'آیتم حذف شد' });
+  } catch (error: any) {
     console.error('Error deleting menu item:', error);
     return NextResponse.json(
-      { message: 'خطا در پردازش درخواست' },
-      { status: 500 }
+      { message: error.message || 'خطا در پردازش درخواست' },
+      { status: error.status || 500 }
     );
   }
 }

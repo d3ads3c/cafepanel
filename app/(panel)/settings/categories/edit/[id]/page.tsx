@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { useToast } from "@/lib/useToast";
 
 interface Category {
   id: number;
@@ -10,6 +10,7 @@ interface Category {
 }
 
 export default function EditCategory() {
+  const { success: showSuccess, error: showError } = useToast();
   const params = useParams();
   const router = useRouter();
   const categoryId = params.id as string;
@@ -39,7 +40,7 @@ export default function EditCategory() {
         setError(result.message || 'خطا در دریافت اطلاعات دسته‌بندی');
       }
     } catch (error) {
-      console.error('Error fetching category:', error);
+      console.error('Error fetching category');
       setError('خطا در ارتباط با سرور');
     } finally {
       setIsLoading(false);
@@ -65,7 +66,7 @@ export default function EditCategory() {
     e.preventDefault();
     
     if (!formData.name.trim()) {
-      toast.error("لطفا نام دسته‌بندی را وارد کنید");
+      showError("لطفا نام دسته‌بندی را وارد کنید");
       return;
     }
 
@@ -83,15 +84,15 @@ export default function EditCategory() {
       });
 
       if (response.ok) {
-        toast.success("دسته‌بندی با موفقیت ویرایش شد");
+        showSuccess("دسته‌بندی با موفقیت ویرایش شد");
         router.push('/settings/categories');
       } else {
         const errorData = await response.json();
-        toast.error(`خطا در ویرایش دسته‌بندی: ${errorData.message || 'خطای نامشخص'}`);
+        showError(`خطا در ویرایش دسته‌بندی: ${errorData.message || 'خطای نامشخص'}`);
       }
     } catch (error) {
-      console.error('Error updating category:', error);
-      toast.error("خطا در ارتباط با سرور");
+      console.error('Error updating category');
+      showError("خطا در ارتباط با سرور");
     } finally {
       setIsSubmitting(false);
     }
@@ -110,15 +111,15 @@ export default function EditCategory() {
       });
 
       if (response.ok) {
-        toast.success("دسته‌بندی با موفقیت حذف شد");
+        showSuccess("دسته‌بندی با موفقیت حذف شد");
         router.push('/settings/categories');
       } else {
         const errorData = await response.json();
-        toast.error(`خطا در حذف دسته‌بندی: ${errorData.message || 'خطای نامشخص'}`);
+        showError(`خطا در حذف دسته‌بندی: ${errorData.message || 'خطای نامشخص'}`);
       }
     } catch (error) {
-      console.error('Error deleting category:', error);
-      toast.error("خطا در ارتباط با سرور");
+      console.error('Error deleting category');
+      showError("خطا در ارتباط با سرور");
     } finally {
       setIsSubmitting(false);
     }

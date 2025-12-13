@@ -43,29 +43,46 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
     <div className="relative">
       <button
         type="button"
-        className="border text-gray-600 rounded-lg p-3 text-sm w-full text-right"
+        className="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all duration-200 text-right flex items-center justify-between hover:border-gray-300"
         onClick={() => setIsOpen(!isOpen)}
       >
-        {getSelectedName()}
+        <span className={selectedValue === null ? "text-gray-500" : "text-gray-900"}>
+          {getSelectedName()}
+        </span>
+        <svg
+          className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
       </button>
       {isOpen && (
-        <ul className="absolute w-full bg-white border border-gray-200 p-3 rounded-lg mt-1 text-sm text-gray-700 max-h-[150px] z-20 overflow-auto custom-scroll">
-          <li
-            className="p-2 hover:bg-gray-100 cursor-pointer text-gray-500"
-            onClick={() => handleSelect(null)}
-          >
-            بدون دسته‌بندی
-          </li>
-          {options.map((option) => (
+        <div className="fixed top-0 right-0 w-full h-screen bg-black/50 backdrop-blur-lg z-40 flex flex-col justify-end p-2">
+          <div onClick={() => setIsOpen(false)} className="rounded-full bg-white/50 mx-auto w-fit py-2 px-5 border border-white/30">
+            <p>بازگشت</p>
+          </div>
+          <ul className="w-full md:w-1/3 mx-auto bg-white rounded-3xl mt-2 text-sm hide-scroll text-gray-700 max-h-[50%] overflow-auto">
             <li
-              key={option.id}
-              className="p-2 hover:bg-gray-100 cursor-pointer"
-              onClick={() => handleSelect(option.id)}
+              className="px-4 py-3 hover:bg-teal-50 cursor-pointer text-gray-500 hover:text-teal-600 border-b border-gray-100 transition-colors"
+              onClick={() => handleSelect(null)}
             >
-              {option.name}
+              بدون دسته‌بندی
             </li>
-          ))}
-        </ul>
+            {options.map((option) => (
+              <li
+                key={option.id}
+                className={`px-4 py-3 hover:bg-teal-50 cursor-pointer border-b border-gray-100 transition-colors ${selectedValue === option.id ? "bg-teal-100 text-teal-700 font-semibold" : "text-gray-700"
+                  }`}
+                onClick={() => handleSelect(option.id)}
+              >
+                {option.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+
       )}
     </div>
   );

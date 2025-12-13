@@ -1,14 +1,24 @@
-import { NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { getAuth } from '@/lib/auth';
+import { NextRequest, NextResponse } from "next/server";
+import { executeQueryOnUserDB } from "@/lib/dbHelper";
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // PUT - Update status
-export async function PUT(request: Request) {
-  const auth = await getAuth();
+export async function PUT(request: NextRequest) {
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_buylist')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
+
+  const dbName = await getUserDatabaseFromRequest(request);
+  if (!dbName) {
+    return NextResponse.json(
+      { success: false, message: 'Unable to determine user database' },
+      { status: 401 }
+    );
+  }
+
   const body = await request.json();
   const { bl_status } = body;
   // Validate that bl_status is either a boolean or "true"/"false" string
@@ -39,12 +49,12 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const connection = await pool.getConnection();
-    await connection.execute(
-      "UPDATE buylist SET bl_status = ? WHERE bl_ID = ?",
-      [statusString, id]
-    );
-    connection.release();
+    await executeQueryOnUserDB(dbName, async (connection) => {
+      await connection.execute(
+        "UPDATE buylist SET bl_status = ? WHERE bl_ID = ?",
+        [statusString, id]
+      );
+    });
 
     return NextResponse.json({
       success: true,
@@ -60,12 +70,21 @@ export async function PUT(request: Request) {
 
 // DELETE - Remove item
 export async function DELETE(
-  request: Request
+  request: NextRequest
 ) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_buylist')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
+
+  const dbName = await getUserDatabaseFromRequest(request);
+  if (!dbName) {
+    return NextResponse.json(
+      { success: false, message: 'Unable to determine user database' },
+      { status: 401 }
+    );
+  }
+
   const pathname = new URL(request.url).pathname;
   const match = pathname.match(/\/api\/buylist\/([^/]+)(?:\/)?$/);
   const idParam = match?.[1];
@@ -78,9 +97,9 @@ export async function DELETE(
   }
 
   try {
-    const connection = await pool.getConnection();
-    await connection.execute("DELETE FROM buylist WHERE bl_ID = ?", [id]);
-    connection.release();
+    await executeQueryOnUserDB(dbName, async (connection) => {
+      await connection.execute("DELETE FROM buylist WHERE bl_ID = ?", [id]);
+    });
 
     return NextResponse.json({ success: true, message: "آیتم حذف شد" });
   } catch (err) {

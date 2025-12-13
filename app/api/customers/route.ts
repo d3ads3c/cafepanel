@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { executeQuery } from "@/lib/dbHelper";
-import { getAuth } from '@/lib/auth';
+import { executeQueryOnUserDB } from "@/lib/dbHelper";
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
-export async function GET() {
-  const auth = await getAuth();
+export async function GET(request: NextRequest) {
+  const auth = await getEnhancedAuth(request);
+  
   if (!hasPermission(auth, 'manage_customers')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
-    const data = await executeQuery(async (connection) => {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const data = await executeQueryOnUserDB(dbName, async (connection) => {
       const selectQuery = `
         SELECT 
           c.id, c.name, c.phone, c.email, c.address, c.notes, c.created_at, c.updated_at,
@@ -47,7 +57,7 @@ export async function GET() {
       data: data,
     });
   } catch (error) {
-    console.error("Error fetching customers:", error);
+    console.error("Error fetching customers:");
     return NextResponse.json(
       { success: false, message: "خطا در دریافت اطلاعات مشتریان" },
       { status: 500 }
@@ -56,7 +66,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
+  
   if (!hasPermission(auth, 'manage_customers')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
@@ -70,7 +81,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await executeQuery(async (connection) => {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const result = await executeQueryOnUserDB(dbName, async (connection) => {
       // Check if customer with same phone already exists
       const [existingRows] = await connection.execute(
         "SELECT id FROM customers WHERE phone = ?",
@@ -96,7 +115,7 @@ export async function POST(request: NextRequest) {
       message: "مشتری با موفقیت اضافه شد",
     });
   } catch (error: any) {
-    console.error("Error creating customer:", error);
+    console.error("Error creating customer:");
     return NextResponse.json(
       { success: false, message: error.message || "خطا در ایجاد مشتری" },
       { status: error.status || 500 }

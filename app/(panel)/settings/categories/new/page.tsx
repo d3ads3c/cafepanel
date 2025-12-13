@@ -2,9 +2,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
+import { useToast } from "@/lib/useToast";
 
 export default function NewCategory() {
+  const { success: showSuccess, error: showError } = useToast();
   const router = useRouter();
   const [formData, setFormData] = useState({
     name: ""
@@ -18,12 +19,11 @@ export default function NewCategory() {
       [name]: value
     }));
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name.trim()) {
-      toast.error("لطفا نام دسته‌بندی را وارد کنید");
+      showError("لطفا نام دسته‌بندی را وارد کنید");
       return;
     }
 
@@ -41,15 +41,15 @@ export default function NewCategory() {
       });
 
       if (response.ok) {
-        toast.success("دسته‌بندی با موفقیت ایجاد شد");
+        showSuccess("دسته‌بندی با موفقیت ایجاد شد");
         router.push('/settings/categories');
       } else {
         const errorData = await response.json();
-        toast.error(`خطا در ایجاد دسته‌بندی: ${errorData.message || 'خطای نامشخص'}`);
+        showError(`خطا در ایجاد دسته‌بندی: ${errorData.message || 'خطای نامشخص'}`);
       }
     } catch (error) {
-      console.error('Error creating category:', error);
-      toast.error("خطا در ارتباط با سرور");
+      console.error('Error creating category');
+      showError("خطا در ارتباط با سرور");
     } finally {
       setIsSubmitting(false);
     }

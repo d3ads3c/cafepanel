@@ -1,15 +1,15 @@
 import { NextResponse, NextRequest } from 'next/server'
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get('auth_token')?.value
+export function proxy(request: NextRequest) {
+  const token = request.cookies.get('LoggedUser')?.value
   const { pathname } = request.nextUrl
 
   const isLogin = pathname === '/'
-  const protectedPrefixes = ['/dashboard', '/orders', '/menu', '/box', '/customers', '/settings', '/accounting']
+  const protectedPrefixes = ['/dashboard', '/orders', '/menu', '/box', '/customers', '/settings', '/accounting', '/']
   const isProtected = protectedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   if (isProtected && !token) {
-    const url = new URL('/', request.url)
+    const url = new URL('http://localhost:3001/login', request.url)
     url.searchParams.set('next', pathname)
     return NextResponse.redirect(url)
   }

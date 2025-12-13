@@ -3,20 +3,29 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import pool from '@/lib/db';
-import { getAuth } from '@/lib/auth';
+import { executeQueryOnUserDB } from '@/lib/dbHelper';
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 export async function POST(request: NextRequest) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_menu')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     
     // Validate required fields
-    if (!body.name || !body.price || !body.info) {
+    if (!body.name || !body.price) {
       return NextResponse.json(
         { message: 'نام، قیمت و توضیحات الزامی هستند' },
         { status: 400 }
@@ -58,7 +67,6 @@ export async function POST(request: NextRequest) {
         // Set image path for database storage
         imagePath = `/img/product/${filename}`;
         
-        console.log('Image saved:', imagePath);
       } catch (imageError) {
         console.error('Error saving image:', imageError);
         return NextResponse.json(
@@ -69,13 +77,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert data into MariaDB
-    try {
-      const connection = await pool.getConnection();
+    const result = await executeQueryOnUserDB(dbName, async (connection) => {
+      const menuShow = body.menu_show !== undefined ? body.menu_show : 1;
       
       const insertQuery = `
         INSERT INTO menu 
-        (menu_name, menu_info, menu_price, menu_img, menu_category, menu_status) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        (menu_name, menu_info, menu_price, menu_img, menu_category, menu_status, menu_show) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
       
       const values = [
@@ -84,48 +92,34 @@ export async function POST(request: NextRequest) {
         body.price,
         imagePath || null,
         body.categoryId || null,
-        1
+        1,
+        menuShow
       ];
 
-      const [result] = await connection.execute(insertQuery, values);
-      connection.release();
-
-      console.log('Menu item saved to database:', {
-        id: (result as any).insertId,
+      const [insertResult] = await connection.execute(insertQuery, values);
+      return {
+        id: (insertResult as any).insertId,
         name: body.name,
         price: body.price,
         info: body.info,
-        image: imagePath
-      });
+        image: imagePath,
+        status: 1
+      };
+    });
 
-      return NextResponse.json(
-        { 
-          message: 'آیتم با موفقیت ثبت شد',
-          data: {
-            id: (result as any).insertId,
-            name: body.name,
-            price: body.price,
-            info: body.info,
-            image: imagePath,
-            status: 1
-          }
-        },
-        { status: 201 }
-      );
+    return NextResponse.json(
+      { 
+        message: 'آیتم با موفقیت ثبت شد',
+        data: result
+      },
+      { status: 201 }
+    );
 
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      return NextResponse.json(
-        { message: 'خطا در ذخیره در پایگاه داده' },
-        { status: 500 }
-      );
-    }
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating menu item:', error);
     return NextResponse.json(
-      { message: 'خطا در پردازش درخواست' },
-      { status: 500 }
+      { message: error.message || 'خطا در پردازش درخواست' },
+      { status: error.status || 500 }
     );
   }
 }

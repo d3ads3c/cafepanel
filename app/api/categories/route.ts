@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeQuery } from '@/lib/dbHelper';
-import { getAuth } from '@/lib/auth';
+import { executeQueryOnUserDB } from '@/lib/dbHelper';
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // GET - Fetch all categories
 export async function GET(request: NextRequest) {
   try {
-    const categories = await executeQuery(async (connection) => {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const categories = await executeQueryOnUserDB(dbName, async (connection) => {
       const selectQuery = `
         SELECT 
           category_ID,
@@ -30,7 +39,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    console.error('Error fetching categories');
     return NextResponse.json(
       { 
         success: false,
@@ -43,11 +52,19 @@ export async function GET(request: NextRequest) {
 
 // POST - Create new category
 export async function POST(request: NextRequest) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_categories')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     
     // Validate required fields
@@ -61,7 +78,7 @@ export async function POST(request: NextRequest) {
     const categoryName = body.name.trim();
 
     // Check if category already exists and insert if not
-    const result = await executeQuery(async (connection) => {
+    const result = await executeQueryOnUserDB(dbName, async (connection) => {
       const checkQuery = `
         SELECT category_ID FROM categories 
         WHERE category_name = ?
@@ -84,11 +101,6 @@ export async function POST(request: NextRequest) {
       return insertResult;
     });
 
-    console.log('Category created:', {
-      id: (result as any).insertId,
-      name: categoryName
-    });
-
     return NextResponse.json(
       { 
         message: 'دسته‌بندی با موفقیت ایجاد شد',
@@ -101,7 +113,7 @@ export async function POST(request: NextRequest) {
     );
 
   } catch (error: any) {
-    console.error('Error creating category:', error);
+    console.error('Error creating category:');
     return NextResponse.json(
       { message: error.message || 'خطا در پردازش درخواست' },
       { status: 500 }

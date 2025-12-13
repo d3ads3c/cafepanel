@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { getAuth } from '@/lib/auth';
+import { executeQueryOnUserDB } from "@/lib/dbHelper";
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // GET all buylist items
-export async function GET() {
-  const auth = await getAuth();
+export async function GET(request: NextRequest) {
+  const auth = await getEnhancedAuth(request);
+  
   if (!hasPermission(auth, 'manage_buylist')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
-    const connection = await pool.getConnection();
-    const [rows] = await connection.execute("SELECT * FROM buylist");
-    connection.release();
-    return NextResponse.json({ success: true, data: rows });
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const buylist = await executeQueryOnUserDB(dbName, async (connection) => {
+      const [rows] = await connection.execute("SELECT * FROM buylist");
+      return rows;
+    });
+    return NextResponse.json({ success: true, data: buylist });
   } catch (err) {
     return NextResponse.json(
       { success: false, error: "DB error" },
@@ -24,10 +35,19 @@ export async function GET() {
 
 // POST new buylist item
 export async function POST(request: NextRequest) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
+  
   if (!hasPermission(auth, 'manage_buylist')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
+  const dbName = await getUserDatabaseFromRequest(request);
+  if (!dbName) {
+    return NextResponse.json(
+      { success: false, message: 'Unable to determine user database' },
+      { status: 401 }
+    );
+  }
+
   const body = await request.json();
   const { bl_item, bl_info } = body;
 
@@ -39,12 +59,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const connection = await pool.getConnection();
-    await connection.execute(
-      "INSERT INTO buylist (bl_item, bl_info, bl_status) VALUES (?, ?, ?)",
-      [bl_item, bl_info || "", "false"]
-    );
-    connection.release();
+    await executeQueryOnUserDB(dbName, async (connection) => {
+      await connection.execute(
+        "INSERT INTO buylist (bl_item, bl_info, bl_status) VALUES (?, ?, ?)",
+        [bl_item, bl_info || "", "false"]
+      );
+    });
 
     return NextResponse.json({ success: true, message: "آیتم اضافه شد" });
   } catch (err) {

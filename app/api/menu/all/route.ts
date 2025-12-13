@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeQuery } from '@/lib/dbHelper';
+import { executeQueryOnUserDB } from '@/lib/dbHelper';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 export async function GET(request: NextRequest) {
   try {
-    const menuItems = await executeQuery(async (connection) => {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const menuItems = await executeQueryOnUserDB(dbName, async (connection) => {
       const selectQuery = `
         SELECT 
           m.menu_ID,
@@ -41,7 +50,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching menu items:', error);
+    console.error('Error fetching menu items');
     return NextResponse.json(
       { 
         success: false,

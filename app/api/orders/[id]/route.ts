@@ -1,70 +1,81 @@
-import { NextResponse } from 'next/server';
-import pool from '@/lib/db';
-import { getAuth } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { executeTransactionOnUserDB } from '@/lib/dbHelper';
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // PUT - Update order status and items
 export async function PUT(
-  request: Request
+  request: NextRequest
 ) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_orders')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/orders\/([^/]+)(?:\/)?$/);
     const orderId = match?.[1];
     const body = await request.json();
     
-    // Validate required fields
-    if (!body.status) {
+    // Validate required fields - status is required unless only updating payment method
+    if (!body.status && !body.paymentMethod) {
       return NextResponse.json(
         { success: false, message: 'وضعیت سفارش الزامی است' },
         { status: 400 }
       );
     }
 
-    const connection = await pool.getConnection();
-    
-    try {
-      // Start transaction
-      await connection.beginTransaction();
+    const result = await executeTransactionOnUserDB(dbName, async (connection) => {
+      // Get existing order data first
+      const [existingOrderData] = await connection.execute(
+        'SELECT total_items, total_price, payment_method, order_status, customer_name, table_number FROM orders WHERE order_ID = ?',
+        [orderId]
+      );
 
-             // Update order status and totals
+      if (!existingOrderData || (existingOrderData as any[])[0] === undefined) {
+        throw { status: 404, message: 'سفارش مورد نظر یافت نشد' };
+      }
+
+      const existingOrder = (existingOrderData as any[])[0];
+
+      // If only updating payment method, preserve existing status
+      const orderStatus = body.status ?? existingOrder.order_status;
+      let totalItems = body.totalItems ?? existingOrder.total_items;
+      let totalPrice = body.totalPrice ?? existingOrder.total_price;
+      let paymentMethod = body.paymentMethod ?? existingOrder.payment_method;
+      const customerName = body.customerName ?? existingOrder.customer_name;
+      const tableNumber = body.tableNumber ?? existingOrder.table_number;
+
+      // Update order status and totals
       // Support payment_method
       const updateOrderQuery = `
         UPDATE orders 
-        SET order_status = ?, total_items = ?, total_price = ?, updated_at = CURRENT_TIMESTAMP, payment_method = ?
+        SET order_status = ?, total_items = ?, total_price = ?, updated_at = CURRENT_TIMESTAMP, payment_method = ?, customer_name = ?, table_number = ?
         WHERE order_ID = ?
       `;
 
-      // If only status is being updated (no items provided), preserve existing totals
-      let totalItems = body.totalItems;
-      let totalPrice = body.totalPrice;
-      let paymentMethod = body.paymentMethod ?? null;
-
-      if (!body.items && (body.totalItems === undefined || body.totalPrice === undefined)) {
-        // Get existing totals and payment_method from database
-        const [existingOrder] = await connection.execute(
-          'SELECT total_items, total_price, payment_method FROM orders WHERE order_ID = ?',
-          [orderId]
-        );
-        if (existingOrder && (existingOrder as any[])[0]) {
-          const order = (existingOrder as any[])[0];
-          totalItems = totalItems ?? order.total_items;
-          totalPrice = totalPrice ?? order.total_price;
-          paymentMethod = paymentMethod ?? order.payment_method;
-        }
-      }
-
       const [orderResult] = await connection.execute(updateOrderQuery, [
-        body.status,
+        orderStatus,
         totalItems || 0,
         totalPrice || 0,
         paymentMethod,
+        customerName,
+        tableNumber,
         orderId
       ]);
+
+      if ((orderResult as any).affectedRows === 0) {
+        throw { status: 404, message: 'سفارش مورد نظر یافت نشد' };
+      }
 
       // If items are provided, update order items
       if (body.items && Array.isArray(body.items)) {
@@ -84,112 +95,93 @@ export async function PUT(
         }
       }
 
-      // Commit transaction
-      await connection.commit();
-      connection.release();
-
-      if ((orderResult as any).affectedRows === 0) {
-        return NextResponse.json(
-          { success: false, message: 'سفارش مورد نظر یافت نشد' },
-          { status: 404 }
-        );
-      }
-
-      // If order is being completed, create accounting entries
-      if (body.status === 'completed') {
-        try {
-          // Get order details for accounting
-          const [orderDetails] = await connection.execute(
-            'SELECT customer_name, total_price, payment_method, created_at FROM orders WHERE order_ID = ?',
-            [orderId]
-          );
-          
-          if (orderDetails && (orderDetails as any[])[0]) {
-            const order = (orderDetails as any[])[0];
-            
-            // Create accounting entries
-            const accountingResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/accounting/orders-integration`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                orderId: orderId,
-                orderData: {
-                  customerName: order.customer_name,
-                  totalPrice: order.total_price,
-                  paymentMethod: order.payment_method,
-                  createdAt: order.created_at
-                }
-              })
-            });
-            
-            if (!accountingResponse.ok) {
-              console.error('Failed to create accounting entries for order:', orderId);
-            }
-          }
-        } catch (accountingError) {
-          console.error('Error creating accounting entries:', accountingError);
-          // Don't fail the order update if accounting fails
-        }
-      }
-
-      console.log('Order updated:', {
-        orderId,
-        status: body.status,
+      return {
+        id: orderId,
+        status: orderStatus,
         totalItems: totalItems,
         totalPrice: totalPrice,
         paymentMethod,
-        itemsCount: body.items?.length || 0
-      });
+        customerName
+      };
+    });
 
-      return NextResponse.json({
-        success: true,
-        message: 'سفارش با موفقیت بروزرسانی شد',
-        data: {
-          id: orderId,
-          status: body.status,
-          totalItems: totalItems,
-          totalPrice: totalPrice,
-          paymentMethod
+    // If order is being completed, create accounting entries (outside transaction)
+    if (body.status === 'completed') {
+      try {
+        // Fetch order details for accounting
+        const orderDetails = await executeQueryOnUserDB(dbName, async (connection) => {
+          const [orderRows] = await connection.execute(
+            'SELECT customer_name, total_price, payment_method, created_at FROM orders WHERE order_ID = ?',
+            [orderId]
+          );
+          return (orderRows as any[])[0];
+        });
+
+        if (orderDetails) {
+          const accountingResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/accounting/orders-integration`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: orderId,
+              orderData: {
+                customerName: orderDetails.customer_name,
+                totalPrice: orderDetails.total_price,
+                paymentMethod: orderDetails.payment_method,
+                createdAt: orderDetails.created_at
+              }
+            })
+          });
+          
+          if (!accountingResponse.ok) {
+            console.error('Failed to create accounting entries for order:', orderId);
+          }
         }
-      });
-
-    } catch (dbError) {
-      // Rollback transaction on error
-      await connection.rollback();
-      connection.release();
-      throw dbError;
+      } catch (accountingError) {
+        console.error('Error creating accounting entries:', accountingError);
+        // Don't fail the order update if accounting fails
+      }
     }
 
-  } catch (error) {
+    return NextResponse.json({
+      success: true,
+      message: 'سفارش با موفقیت بروزرسانی شد',
+      data: result
+    });
+
+  } catch (error: any) {
     console.error('Error updating order:', error);
     return NextResponse.json(
       { 
         success: false,
-        message: 'خطا در بروزرسانی سفارش' 
+        message: error.message || 'خطا در بروزرسانی سفارش' 
       },
-      { status: 500 }
+      { status: error.status || 500 }
     );
   }
 }
 
 // DELETE - Delete order
 export async function DELETE(
-  request: Request
+  request: NextRequest
 ) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
   if (!hasPermission(auth, 'manage_orders')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
     const pathname = new URL(request.url).pathname;
     const match = pathname.match(/\/api\/orders\/([^/]+)(?:\/)?$/);
     const orderId = match?.[1];
-    const connection = await pool.getConnection();
-    
-    try {
-      // Start transaction
-      await connection.beginTransaction();
-      
+
+    await executeTransactionOnUserDB(dbName, async (connection) => {
       // Delete order items first
       const deleteItemsQuery = 'DELETE FROM order_items WHERE order_ID = ?';
       await connection.execute(deleteItemsQuery, [orderId]);
@@ -198,36 +190,20 @@ export async function DELETE(
       const deleteOrderQuery = 'DELETE FROM orders WHERE order_ID = ?';
       const [result] = await connection.execute(deleteOrderQuery, [orderId]);
       
-      // Commit transaction
-      await connection.commit();
-      
       if ((result as any).affectedRows === 0) {
-        return NextResponse.json(
-          { success: false, message: 'سفارش مورد نظر یافت نشد' },
-          { status: 404 }
-        );
+        throw { status: 404, message: 'سفارش مورد نظر یافت نشد' };
       }
-      
-      return NextResponse.json(
-        { success: true, message: 'سفارش با موفقیت حذف شد' },
-        { status: 200 }
-      );
-    } catch (error) {
-      // Rollback transaction on error
-      await connection.rollback();
-      console.error('Database error:', error);
-      return NextResponse.json(
-        { success: false, message: 'خطا در حذف سفارش' },
-        { status: 500 }
-      );
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    console.error('Server error:', error);
+    });
+    
     return NextResponse.json(
-      { success: false, message: 'خطا در سرور' },
-      { status: 500 }
+      { success: true, message: 'سفارش با موفقیت حذف شد' },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    console.error('Error deleting order:', error);
+    return NextResponse.json(
+      { success: false, message: error.message || 'خطا در حذف سفارش' },
+      { status: error.status || 500 }
     );
   }
 }

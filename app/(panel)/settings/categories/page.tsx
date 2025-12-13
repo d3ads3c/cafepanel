@@ -29,7 +29,7 @@ export default function Categories() {
         setError(result.message || 'خطا در دریافت دسته‌بندی ها');
       }
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error('Error fetching categories');
       setError('خطا در ارتباط با سرور');
     } finally {
       setLoading(false);

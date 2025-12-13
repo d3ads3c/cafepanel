@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeQuery, executeTransaction } from '@/lib/dbHelper';
-import { getAuth } from '@/lib/auth';
+import { executeQueryOnUserDB, executeTransactionOnUserDB } from '@/lib/dbHelper';
+import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // GET - Fetch all orders
 export async function GET(request: NextRequest) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
+  
   if (!hasPermission(auth, 'manage_orders')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
   try {
-    const orders = await executeQuery(async (connection) => {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const orders = await executeQueryOnUserDB(dbName, async (connection) => {
       const selectQuery = `
         SELECT 
           o.order_ID,
@@ -60,7 +70,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching orders:', error);
+    console.error('Error fetching orders');
     return NextResponse.json(
       { 
         success: false,
@@ -73,7 +83,8 @@ export async function GET(request: NextRequest) {
 
 // POST - Create new order
 export async function POST(request: NextRequest) {
-  const auth = await getAuth();
+  const auth = await getEnhancedAuth(request);
+  
   if (!hasPermission(auth, 'manage_orders')) {
     return NextResponse.json({ success: false, message: 'forbidden' }, { status: 403 });
   }
@@ -88,7 +99,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await executeTransaction(async (connection) => {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const result = await executeTransactionOnUserDB(dbName, async (connection) => {
       // Insert order
       const insertOrderQuery = `
         INSERT INTO orders 
@@ -153,7 +172,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Error creating order:', error);
+    console.error('Error creating order');
     return NextResponse.json(
       { 
         success: false,

@@ -12,9 +12,10 @@ export default function MobileHead() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/auth/me');
+        const res = await fetch('/api/auth/me', { method: 'POST' });
         const data = await res.json();
-        const name = data?.data?.username || 'کاربر';
+        const userInfo = data?.Info;
+        const name = userInfo?.Fname || 'کاربر';
         setDisplayName(name);
       } catch { }
     })();
@@ -41,7 +42,7 @@ export default function MobileHead() {
         console.error('Logout failed:', response.statusText);
       }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error('Logout error');
     } finally {
       // Always redirect to login page, even if logout API fails
       router.replace('/');
@@ -50,16 +51,18 @@ export default function MobileHead() {
 
 
   return (
-    <div className={`flex items-center rounded-b-3xl justify-between p-5 fixed z-20 w-full top-0 duration-200 backdrop-blur-md`}>
-      <div className="w-2/3">
-        <p className="text-xs text-gray-400">عصر بخیر</p>
-        <h2 className="text-lg text-black">سلام {displayName}</h2>
+    pathname !== '/settings' && (
+      <div className={`flex items-center rounded-b-3xl justify-between p-5 fixed z-20 w-full top-0 duration-200 backdrop-blur-md`}>
+        <div className="w-2/3">
+          <p className="text-xs text-gray-400">عصر بخیر</p>
+          <h2 className="text-lg text-black">سلام {displayName}</h2>
+        </div>
+        <div className="flex items-center justify-end gap-4">
+          <button onClick={handleLogout} className={`border size-12 rounded-2xl flex items-center justify-center active:scale-95 ${scrolled ? "border-teal-400 text-teal-400" : pathname == '/dashboard2' ? "bg-transparent border-white text-white" : "bg-white border-teal-400 text-teal-400"}`}>
+            <i className="fi fi-sr-power mt-1"></i>
+          </button>
+        </div>
       </div>
-      <div className="flex items-center justify-end gap-4">
-        <button onClick={handleLogout} className={`border size-12 rounded-2xl flex items-center justify-center active:scale-95 ${scrolled ? "border-teal-400 text-teal-400" : pathname == '/dashboard2' ? "bg-transparent border-white text-white" : "bg-white border-teal-400 text-teal-400"}`}>
-          <i className="fi fi-sr-power mt-1"></i>
-        </button>
-      </div>
-    </div>
+    )
   );
 }

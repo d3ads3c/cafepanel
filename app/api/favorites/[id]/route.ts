@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { executeQueryOnUserDB } from '@/lib/dbHelper';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // DELETE - Remove item from favorites
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const favoriteId = params.id;
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+    const favoriteId = id;
 
     // Validate id
     if (!favoriteId) {
@@ -17,34 +27,27 @@ export async function DELETE(
       );
     }
 
-    const connection = await pool.getConnection();
+    await executeQueryOnUserDB(dbName, async (connection) => {
+      // Check if favorite exists
+      const checkQuery = `
+        SELECT id FROM favorites 
+        WHERE id = ?
+      `;
 
-    // Check if favorite exists
-    const checkQuery = `
-      SELECT id FROM favorites 
-      WHERE id = ?
-    `;
+      const [existingRows] = await connection.execute(checkQuery, [favoriteId]);
 
-    const [existingRows] = await connection.execute(checkQuery, [favoriteId]);
+      if ((existingRows as any[]).length === 0) {
+        throw { status: 404, message: 'آیتم پیدا نشد' };
+      }
 
-    if ((existingRows as any[]).length === 0) {
-      connection.release();
-      return NextResponse.json(
-        { success: false, message: 'آیتم پیدا نشد' },
-        { status: 404 }
-      );
-    }
+      // Delete favorite
+      const deleteQuery = `
+        DELETE FROM favorites 
+        WHERE id = ?
+      `;
 
-    // Delete favorite
-    const deleteQuery = `
-      DELETE FROM favorites 
-      WHERE id = ?
-    `;
-
-    await connection.execute(deleteQuery, [favoriteId]);
-    connection.release();
-
-    console.log('Favorite removed:', { id: favoriteId });
+      await connection.execute(deleteQuery, [favoriteId]);
+    });
 
     return NextResponse.json({
       success: true,
@@ -52,7 +55,7 @@ export async function DELETE(
     });
 
   } catch (error) {
-    console.error('Error deleting favorite:', error);
+    console.error('Error deleting favorite');
     return NextResponse.json(
       { success: false, message: 'خطا در حذف آیتم' },
       { status: 500 }

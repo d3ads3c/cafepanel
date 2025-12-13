@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeQuery } from '@/lib/dbHelper';
+import { executeQueryOnUserDB } from '@/lib/dbHelper';
+import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 
 // GET - Fetch all favorite menu items
 export async function GET(request: NextRequest) {
   try {
-    const favorites = await executeQuery(async (connection) => {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const favorites = await executeQueryOnUserDB(dbName, async (connection) => {
       const selectQuery = `
         SELECT 
           f.id,
@@ -37,7 +46,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Error fetching favorites:', error);
+    console.error('Error fetching favorites');
     return NextResponse.json(
       { 
         success: false,
@@ -61,7 +70,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await executeQuery(async (connection) => {
+    const dbName = await getUserDatabaseFromRequest(request);
+    if (!dbName) {
+      return NextResponse.json(
+        { success: false, message: 'Unable to determine user database' },
+        { status: 401 }
+      );
+    }
+
+    const result = await executeQueryOnUserDB(dbName, async (connection) => {
       // Check if item already exists in favorites
       const checkQuery = `
         SELECT id FROM favorites 
@@ -85,11 +102,6 @@ export async function POST(request: NextRequest) {
       return insertResult;
     });
 
-    console.log('Favorite added:', {
-      id: (result as any).insertId,
-      menuId: body.menuId
-    });
-
     return NextResponse.json(
       { 
         success: true,
@@ -103,7 +115,7 @@ export async function POST(request: NextRequest) {
     );
 
   } catch (error: any) {
-    console.error('Error adding favorite:', error);
+    console.error('Error adding favorite');
     return NextResponse.json(
       { success: false, message: error.message || 'خطا در پردازش درخواست' },
       { status: error.status || 500 }

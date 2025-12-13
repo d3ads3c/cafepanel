@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
-import toast from "react-hot-toast";
+import { useToast } from "@/lib/useToast";
 import CustomSelect from "@/components/ui/Select";
 
 export default function NewItem() {
+  const { success: showSuccess, error: showError } = useToast();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -13,7 +14,8 @@ export default function NewItem() {
     info: ""
   });
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
-  const [categories, setCategories] = useState<Array<{id: number, name: string}>>([]);
+  const [categories, setCategories] = useState<Array<{ id: number, name: string }>>([]);
+  const [menuShow, setMenuShow] = useState<number>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -22,7 +24,7 @@ export default function NewItem() {
   const formatPrice = (value: string) => {
     // Remove all non-digit characters
     const numericValue = value.replace(/[^\d]/g, '');
-    
+
     // Add commas for thousands
     if (numericValue) {
       return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -69,15 +71,15 @@ export default function NewItem() {
       try {
         const response = await fetch('/api/categories');
         const result = await response.json();
-        
+
         if (result.success) {
           setCategories(result.data);
         } else {
-          toast.error('خطا در دریافت دسته‌بندی ها');
+          showError('خطا در دریافت دسته‌بندی ها');
         }
       } catch (error) {
-        console.error('Error fetching categories:', error);
-        toast.error('خطا در ارتباط با سرور');
+        console.error('Error fetching categories');
+        showError('خطا در ارتباط با سرور');
       } finally {
         setIsLoadingCategories(false);
       }
@@ -105,7 +107,7 @@ export default function NewItem() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
+
     if (name === 'price') {
       // Format price with commas
       const formattedPrice = formatPrice(value);
@@ -123,18 +125,18 @@ export default function NewItem() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.name || !formData.price || !formData.info) {
-      toast.error("لطفا تمام فیلدها را پر کنید");
+
+    if (!formData.name || !formData.price) {
+      showError("لطفا نام و قیمت را پر کنید");
       return;
     }
 
     // Validate price is not zero
     const numericPrice = parsePrice(formData.price);
-    if (numericPrice <= 0) {
-      toast.error("قیمت باید بیشتر از صفر باشد");
-      return;
-    }
+    // if (numericPrice < 0) {
+    //   showError("قیمت باید بیشتر از صفر باشد");
+    //   return;
+    // }
 
     setIsSubmitting(true);
 
@@ -144,6 +146,7 @@ export default function NewItem() {
         price: numericPrice,
         info: formData.info,
         categoryId: selectedCategoryId,
+        menu_show: menuShow,
         ...(selectedImage && { image: selectedImage })
       };
 
@@ -156,11 +159,12 @@ export default function NewItem() {
       });
 
       if (response.ok) {
-        toast.success("آیتم با موفقیت ثبت شد");
+        showSuccess("آیتم با موفقیت ثبت شد");
         // Reset form
         setFormData({ name: "", price: "", info: "" });
         setSelectedCategoryId(null);
         setSelectedImage(null);
+        setMenuShow(1);
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
@@ -168,142 +172,231 @@ export default function NewItem() {
         window.location.href = '/menu';
       } else {
         const errorData = await response.json();
-        toast.error(`خطا در ثبت آیتم: ${errorData.message || 'خطای نامشخص'}`);
+        showError(`خطا در ثبت آیتم: ${errorData.message || 'خطای نامشخص'}`);
       }
     } catch (error) {
-      console.error('Error submitting form:', error);
-      toast.error("خطا در ارتباط با سرور");
+      console.error('Error submitting form');
+      showError("خطا در ارتباط با سرور");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="mt-20 pb-32">
-      <div className="px-5 pt-5 flex items-center justify-between">
-        <h1 className="font-bold">افزودن آیتم</h1>
-        <Link
-          href={"/menu"}
-          className="py-2 px-5 rounded-xl bg-teal-400 text-white text-sm shadow-xl shadow-teal-100"
-        >
-          بازگشت
-        </Link>
-      </div>
-      <form onSubmit={handleSubmit} className="mt-5 px-5 pt-5">
-        <div className="relative" onDrop={handleDrop} onDragOver={handleDragOver}>
-          {selectedImage ? (
-            <div className="relative">
-              <img
-                src={selectedImage}
-                alt="تصویر محصول"
-                className="bg-gray-100 rounded-3xl size-60 mx-auto object-cover"
-              />
-              <button
-                type="button"
-                onClick={handleRemoveImage}
-                className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-red-600 transition-colors"
-                title="حذف تصویر"
-              >
-                ×
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleButtonClick}
-              className="bg-gray-100 rounded-3xl size-60 mx-auto flex flex-col items-center justify-center text-gray-400 hover:bg-gray-200 transition-colors cursor-pointer border-2 border-dashed border-gray-300 hover:border-gray-400"
-            >
-              <svg
-                className="w-12 h-12 mb-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <span className="text-sm">انتخاب یا رها کردن تصویر اینجا</span>
-            </button>
-          )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageSelect}
-            className="hidden"
-          />
-          {imageError && (
-            <div className="text-center text-red-600 text-xs mt-2">{imageError}</div>
-          )}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 py-8 px-4 sm:px-6 pt-28">
+      {/* Header */}
+      <div className="max-w-2xl mx-auto mb-8">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="md:text-xl font-bold bg-gradient-to-r from-teal-600 to-teal-400 bg-clip-text text-transparent">
+              افزودن آیتم جدید
+            </h1>
+            <p className="text-gray-500 text-xs font-light">یک محصول جدید به منو خود اضافه کنید</p>
+          </div>
+          <Link
+            href={"/menu"}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-gray-700 text-sm font-medium border border-gray-200 hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50 transition-all duration-200 shadow-sm"
+          >
+            بازگشت
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </Link>
         </div>
-        <div className="space-y-7 mt-4">
-          <div>
-            <p className="text-sm mb-2">نام آیتم</p>
-            <input
-              name="name"
-              type="text"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="w-full p-3.5 text-sm border rounded-xl focus:outline-none"
-              required
-            />
-          </div>
-          <div>
-            <p className="text-sm mb-2">قیمت محصول</p>
-            <div className="flex items-center justify-between gap-5">
-              <input
-                type="text"
-                name="price"
-                value={formData.price}
-                onChange={handleInputChange}
-                placeholder="مثال: ۱۵,۰۰۰"
-                className="w-4/5 p-3.5 text-sm border rounded-xl focus:outline-none"
-                required
-              />
-              <div className="w-1/5">
-                <h3 className="text-teal-400">تومان</h3>
-              </div>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm mb-2">دسته‌بندی</p>
-            {isLoadingCategories ? (
-              <div className="w-full p-3.5 text-sm border rounded-xl bg-gray-50 text-gray-500">
-                در حال بارگذاری دسته‌بندی ها...
+      </div>
+
+      {/* Form Container */}
+      <div className="max-w-2xl mx-auto">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Image Upload Section */}
+          <div className="relative" onDrop={handleDrop} onDragOver={handleDragOver}>
+            {selectedImage ? (
+              <div className="relative group">
+                <div className="relative rounded-2xl overflow-hidden bg-gray-100 w-full aspect-square max-w-sm mx-auto shadow-lg">
+                  <img
+                    src={selectedImage}
+                    alt="تصویر محصول"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200"></div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center text-lg hover:bg-red-600 transition-all duration-200 shadow-md hover:shadow-lg active:scale-95"
+                  title="حذف تصویر"
+                >
+                  ×
+                </button>
               </div>
             ) : (
-              <CustomSelect
-                options={categories}
-                onSelect={setSelectedCategoryId}
-                placeholder="انتخاب دسته‌بندی"
-              />
+              <button
+                type="button"
+                onClick={handleButtonClick}
+                className="w-full max-w-sm mx-auto block p-8 rounded-2xl border-2 border-dashed border-gray-300 bg-gradient-to-br from-gray-50 to-white hover:from-teal-50 hover:to-teal-25 hover:border-teal-400 transition-all duration-200 cursor-pointer group"
+              >
+                <div className="flex flex-col items-center justify-center gap-4">
+                  <div className="p-4 rounded-lg bg-teal-100 text-teal-600 group-hover:scale-110 transition-transform duration-200">
+                    <svg
+                      className="w-8 h-8"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-gray-800">تصویر محصول را اضافه کنید</p>
+                    <p className="text-sm text-gray-500 mt-1">تصویر را رها کنید یا برای انتخاب کلیک کنید</p>
+                  </div>
+                </div>
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            {imageError && (
+              <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm text-center animate-pulse">
+                {imageError}
+              </div>
             )}
           </div>
-          <div>
-            <p className="text-sm mb-2">توضیحات محصول</p>
-            <textarea
-              name="info"
-              rows={3}
-              value={formData.info}
-              onChange={handleInputChange}
-              className="w-full p-3.5 text-sm border rounded-xl focus:outline-none"
-              required
-            ></textarea>
+
+          {/* Form Fields */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+            {/* Name Field */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+                نام آیتم
+              </label>
+              <input
+                name="name"
+                type="text"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="مثال: قهوه اسپرسو"
+                className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all duration-200"
+                required
+              />
+            </div>
+
+            {/* Price Field */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+                قیمت محصول
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  name="price"
+                  value={formData.price}
+                  onChange={handleInputChange}
+                  placeholder="مثال: 15000"
+                  className="flex-1 px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all duration-200"
+                  required
+                />
+                <span className="px-4 py-3 bg-teal-50 text-teal-600 font-semibold rounded-lg border border-teal-200 text-sm">
+                  تومان
+                </span>
+              </div>
+            </div>
+
+            {/* Category Field */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+                دسته‌بندی
+              </label>
+              {isLoadingCategories ? (
+                <div className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-500 flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-gray-300 border-t-teal-400 rounded-full animate-spin"></div>
+                  در حال بارگذاری...
+                </div>
+              ) : (
+                <CustomSelect
+                  options={categories}
+                  onSelect={setSelectedCategoryId}
+                  placeholder="انتخاب دسته‌بندی"
+                />
+              )}
+            </div>
+
+            {/* Description Field */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-800 mb-2.5">
+                توضیحات محصول <span className="text-gray-400 text-xs font-normal">(اختیاری)</span>
+              </label>
+              <textarea
+                name="info"
+                rows={4}
+                value={formData.info}
+                onChange={handleInputChange}
+                placeholder="توضیحات تفصیلی محصول را وارد کنید..."
+                className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition-all duration-200 resize-none"
+              ></textarea>
+            </div>
+
+            {/* Menu Show Checkbox */}
+            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={menuShow === 1}
+                  onChange={(e) => setMenuShow(e.target.checked ? 1 : 0)}
+                  className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500 focus:ring-2 cursor-pointer"
+                />
+                <span className="text-sm font-semibold text-gray-800">
+                  نمایش در منو
+                </span>
+              </label>
+              <span className="text-xs text-gray-500">
+                {menuShow === 1 ? 'آیتم در منو نمایش داده می‌شود' : 'آیتم در منو مخفی است'}
+              </span>
+            </div>
           </div>
-          <button 
+
+          {/* Submit Button */}
+          <button
             type="submit"
             disabled={isSubmitting}
-            className="text-white bg-teal-400 py-3 rounded-xl shadow-xl shadow-teal-100 w-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-teal-500 transition-colors"
+            className="w-full py-3.5 px-6 bg-gradient-to-r from-teal-500 to-teal-600 text-white font-semibold rounded-lg hover:from-teal-600 hover:to-teal-700 disabled:opacity-60 disabled:cursor-not-allowed disabled:from-teal-500 disabled:to-teal-600 transition-all duration-200 shadow-md hover:shadow-lg active:shadow-sm text-base flex items-center justify-center gap-2"
           >
-            {isSubmitting ? "در حال ثبت..." : "ثبت آیتم جدید"}
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                در حال ثبت...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                ثبت آیتم جدید
+              </>
+            )}
           </button>
-        </div>
-      </form>
+
+          {/* Info Box */}
+          <div className="p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm">
+            <div className="flex gap-3">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              <p>نام و قیمت الزامی هستند. توضیحات محصول اختیاری است.</p>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -5,9 +5,16 @@ interface DrawerProps {
   onClose: () => void;
   children: React.ReactNode;
   height: number;
+  className?: string;
 }
 
-const Drawer: React.FC<DrawerProps> = ({ open, onClose, height, children }) => {
+const Drawer: React.FC<DrawerProps> = ({
+  open,
+  onClose,
+  height,
+  children,
+  className,
+}) => {
   return (
     <div
       className={`fixed inset-0 z-50 transition-transform backdrop-blur-sm ${
@@ -21,7 +28,7 @@ const Drawer: React.FC<DrawerProps> = ({ open, onClose, height, children }) => {
         onClick={onClose}
       ></div>
       <div
-        className={`fixed inset-x-0 bottom-0 h-[${height}%] bg-white shadow-lg py-8 px-5 rounded-t-3xl`}
+        className={`fixed inset-x-0 bottom-0 h-[${height}%] ${className} bg-white shadow-lg py-8 px-5 rounded-t-[40px]`}
       >
         {children}
       </div>
