@@ -112,7 +112,7 @@ export default function InvoicesPage() {
   });
 
   return (
-    <div className="min-h-screen py-4">
+    <div className="min-h-screen py-4 px-2">
       <div className="mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -170,8 +170,8 @@ export default function InvoicesPage() {
           />
         </Card>
 
-        {/* Invoices Table */}
-        <Card className="overflow-hidden border border-gray-200">
+        {/* Invoices Table - Desktop */}
+        <Card className="overflow-hidden border border-gray-200 hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="border-b border-gray-200">
@@ -323,6 +323,127 @@ export default function InvoicesPage() {
             </table>
           </div>
         </Card>
+
+        {/* Invoices Cards - Mobile */}
+        <div className="space-y-3 md:hidden">
+          {loading ? (
+            <Card className="border border-gray-200">
+              <div className="flex flex-col items-center py-8 text-gray-500 text-sm">
+                <div className="w-8 h-8 border-4 border-gray-300 border-t-teal-500 rounded-full animate-spin mb-2"></div>
+                در حال بارگذاری...
+              </div>
+            </Card>
+          ) : filteredInvoices.length === 0 ? (
+            <Card className="border border-gray-200">
+              <div className="flex flex-col items-center py-8 text-gray-500 text-sm">
+                <svg
+                  className="w-14 h-14 text-gray-300 mb-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                {searchTerm ? "نتیجه‌ای یافت نشد" : "فاکتوری یافت نشد"}
+              </div>
+            </Card>
+          ) : (
+            filteredInvoices.map((invoice) => (
+              <Card
+                key={invoice.id}
+                className="border border-gray-200 hover:border-teal-300 hover:shadow-sm transition-all"
+              >
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <button
+                        className="text-teal-600 hover:text-teal-800 font-semibold text-sm"
+                        onClick={() => openDrawer(invoice)}
+                      >
+                        فاکتور #{invoice.invoice_number}
+                      </button>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {new Date(invoice.invoice_date).toLocaleDateString(
+                          "fa-IR"
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${
+                        invoice.invoice_type === "sell"
+                          ? "bg-green-50 text-green-700 border border-green-100"
+                          : "bg-blue-50 text-blue-700 border border-blue-100"
+                      }`}
+                    >
+                      {invoice.invoice_type === "sell" ? "فروش" : "خرید"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span className="line-clamp-1">
+                      {invoice.contact_name || "بدون مخاطب"}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                        invoice.payment_status === "paid"
+                          ? "bg-green-50 text-green-700 border border-green-100"
+                          : invoice.payment_status === "partial"
+                          ? "bg-yellow-50 text-yellow-700 border border-yellow-100"
+                          : invoice.payment_status === "pending"
+                          ? "bg-gray-50 text-gray-700 border border-gray-100"
+                          : "bg-red-50 text-red-700 border border-red-100"
+                      }`}
+                    >
+                      {invoice.payment_status === "paid" && "پرداخت شده"}
+                      {invoice.payment_status === "partial" && "جزئی"}
+                      {invoice.payment_status === "pending" && "در انتظار"}
+                      {invoice.payment_status === "cancelled" && "لغو شده"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-xs text-gray-600">
+                      <p>مبلغ کل</p>
+                      <p className="font-semibold text-gray-900 mt-0.5">
+                        {formatPrice(invoice.total_amount)} تومان
+                      </p>
+                    </div>
+                    <div className="text-xs text-gray-600 text-right">
+                      <p>مبلغ نهایی</p>
+                      <p className="font-semibold text-teal-700 mt-0.5">
+                        {formatPrice(invoice.final_amount)} تومان
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-1">
+                    <button
+                      onClick={() =>
+                        router.push(
+                          `/accounting/invoices/${invoice.id}/edit`
+                        )
+                      }
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      ویرایش
+                    </button>
+                    <button
+                      onClick={() => handleDelete(invoice.id)}
+                      className="text-xs text-red-600 hover:text-red-800 font-medium"
+                    >
+                      حذف
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
       </div>
 
       <Drawer

@@ -115,8 +115,8 @@ export default function MenuItems() {
   return (
     <div className="min-h-screen bg-gradient-to-br py-8 px-2 sm:px-6">
       {/* Header */}
-      <div className="mx-auto mb-8 pt-20 xl:pt-0">
-        <div className="flex sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="mx-auto mb-8 pt-16 xl:pt-0">
+        <div className="xl:flex sm:flex-row space-y-7 xl:space-y-0 items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="sm:text-2xl font-bold bg-gradient-to-r from-teal-600 to-teal-400 bg-clip-text text-transparent">
               آیتم های منو

@@ -47,7 +47,7 @@ export function PlanGuard({
 
     if (showUpgradeMessage) {
       return (
-        <div className="p-4">
+        <div className="xl:p-4 mt-20 xl:mt-0">
           <PlanUpgradeMessage
             requiredPlan={requiredPlan}
             featureName={featureName}

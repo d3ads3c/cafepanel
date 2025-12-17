@@ -381,7 +381,7 @@ export default function CustomersPage() {
               {/* Mobile Card View */}
               <div className="md:hidden divide-y divide-gray-100 p-4 space-y-4">
                 {paginatedCustomers.map((customer) => (
-                  <div key={customer.id} className="bg-gradient-to-br from-slate-50 to-white border border-gray-100 rounded-lg p-4 space-y-3 hover:shadow-md transition-shadow">
+                  <div key={customer.id} className="bg-white p-2 space-y-3 hover:shadow-md transition-shadow">
                     {/* Header with name and actions */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -439,7 +439,7 @@ export default function CustomersPage() {
                         <p className="text-xs text-gray-500">سفارشات</p>
                       </div>
                       <div className="bg-white rounded-lg p-2 text-center">
-                        <p className="font-bold text-teal-600 text-lg">{formatPrice(customer.total_spent).split(/(?=(?:\d{3})+(?!\d))/)[0]}</p>
+                        <p className="font-bold text-teal-600 text-lg">{formatPrice(customer.total_spent)}</p>
                         <p className="text-xs text-gray-500">خرید</p>
                       </div>
                       <div className="bg-white rounded-lg p-2 text-center">

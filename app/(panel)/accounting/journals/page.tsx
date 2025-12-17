@@ -357,7 +357,7 @@ export default function JournalsPage() {
   });
 
   return (
-    <div className="min-h-screen py-4">
+    <div className="min-h-screen py-4 px-3 sm:px-0">
       <div className="mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -405,8 +405,8 @@ export default function JournalsPage() {
           />
         </Card>
 
-        {/* Journals Table */}
-        <Card className="overflow-hidden border border-gray-200">
+        {/* Journals Table - Desktop */}
+        <Card className="overflow-hidden border border-gray-200 hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="border-b border-gray-200">
@@ -483,10 +483,114 @@ export default function JournalsPage() {
             </table>
           </div>
         </Card>
+
+        {/* Journals Cards - Mobile */}
+        <div className="space-y-3 md:hidden">
+          {loading ? (
+            <Card className="border border-gray-200">
+              <div className="flex flex-col items-center py-8 text-gray-500 text-sm">
+                <div className="w-8 h-8 border-4 border-gray-300 border-t-teal-500 rounded-full animate-spin mb-2"></div>
+                در حال بارگذاری...
+              </div>
+            </Card>
+          ) : filteredJournals.length === 0 ? (
+            <Card className="border border-gray-200">
+              <div className="flex flex-col items-center py-8 text-gray-500 text-sm">
+                <svg
+                  className="w-14 h-14 text-gray-300 mb-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+                {searchTerm ? "نتیجه‌ای یافت نشد" : "دفتر روزنامه‌ای ثبت نشده است"}
+              </div>
+            </Card>
+          ) : (
+            filteredJournals.map((journal) => (
+              <Card
+                key={journal.id}
+                className="border border-gray-200 hover:border-teal-300 hover:shadow-sm transition-all"
+              >
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        دفتر #{journal.journal_number}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {new Date(journal.journal_date).toLocaleDateString(
+                          "fa-IR"
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${
+                        journal.status === "posted"
+                          ? "bg-green-50 text-green-700 border border-green-100"
+                          : journal.status === "cancelled"
+                          ? "bg-red-50 text-red-700 border border-red-100"
+                          : "bg-gray-50 text-gray-700 border border-gray-100"
+                      }`}
+                    >
+                      {journal.status === "posted"
+                        ? "ثبت شده"
+                        : journal.status === "cancelled"
+                        ? "لغو شده"
+                        : "پیش‌نویس"}
+                    </span>
+                  </div>
+
+                  {journal.description && (
+                    <p className="text-xs text-gray-600 line-clamp-2">
+                      {journal.description}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-xs text-gray-600">
+                      <p>جمع بدهکار</p>
+                      <p className="font-semibold text-gray-900 mt-0.5" dir="ltr">
+                        {formatPrice(journal.total_debit)}
+                      </p>
+                    </div>
+                    <div className="text-xs text-gray-600 text-right">
+                      <p>جمع بستانکار</p>
+                      <p className="font-semibold text-teal-700 mt-0.5" dir="ltr">
+                        {formatPrice(journal.total_credit)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-1">
+                    <button
+                      onClick={() => handleOpenDrawer(journal)}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      ویرایش
+                    </button>
+                    <button
+                      onClick={() => handleDelete(journal.id)}
+                      className="text-xs text-red-600 hover:text-red-800 font-medium"
+                    >
+                      حذف
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Side Drawer for Add/Edit */}
-      <SideDrawer open={drawerOpen} onClose={handleCloseDrawer} width={1300}>
+      <SideDrawer open={drawerOpen} onClose={handleCloseDrawer} width="100%">
         <div className="h-full flex flex-col bg-white">
           <div className="p-6 border-b border-gray-200 flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-800">

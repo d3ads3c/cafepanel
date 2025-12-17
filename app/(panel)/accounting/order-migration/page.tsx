@@ -40,7 +40,7 @@ export default function OrderIntegration() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6 px-3 sm:px-0">
       <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div className="w-3/4">

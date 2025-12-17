@@ -166,7 +166,7 @@ export default function ContactsPage() {
   };
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6">
+    <div className="min-h-screen py-8 px-3 sm:px-6">
       <div className="mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -306,7 +306,7 @@ export default function ContactsPage() {
       </div>
 
       {/* Side Drawer for Add/Edit */}
-      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} width={500}>
+      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} width="100%">
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
