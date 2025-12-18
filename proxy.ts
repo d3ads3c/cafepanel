@@ -9,7 +9,7 @@ export function proxy(request: NextRequest) {
   const isProtected = protectedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   if (isProtected && !token) {
-    const url = new URL('http://localhost:3001/login', request.url)
+    const url = new URL('http://localhost:3055/login', request.url)
     url.searchParams.set('next', pathname)
     return NextResponse.redirect(url)
   }
