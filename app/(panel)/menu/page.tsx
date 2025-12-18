@@ -23,6 +23,7 @@ export default function MenuItems() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [link, setLink] = useState<string | null>(null);
   const [categories, setCategories] = useState<
     Array<{ id: number; name: string }>
   >([]);
@@ -57,8 +58,15 @@ export default function MenuItems() {
     }
   };
 
+  const MenuLink = async () => {
+    const res = await fetch("/api/auth/me", { method: "POST" });
+    const data = await res.json();
+    setLink(data.Info.Menu);
+  };
+
   // Load data on component mount
   useEffect(() => {
+    MenuLink();
     fetchMenuItems();
     // Load categories for filter
     (async () => {
@@ -130,7 +138,7 @@ export default function MenuItems() {
                 <button
                   type="button"
                   onClick={() =>
-                    downloadQRCode("https://menu.cafegah.ir/cafea")
+                    downloadQRCode("https://menu.cafegah.ir/" + link)
                   }
                   className="text-gray-400 mt-1.5"
                 >
@@ -141,7 +149,7 @@ export default function MenuItems() {
                 </button>
               </div>
               <h3 className="text-sm text-teal-600 bg-gray-100 rounded-full py-1 px-3">
-                https://menu.cafegah.ir/cafea
+                https://menu.cafegah.ir/{link}
               </h3>
             </div>
           </div>
