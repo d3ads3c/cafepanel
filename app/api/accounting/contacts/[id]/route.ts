@@ -7,7 +7,7 @@ import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
 // GET - Get single contact
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getEnhancedAuth(request);
   
@@ -24,7 +24,8 @@ export async function GET(
       );
     }
 
-    const contactId = parseInt(params.id);
+    const { id } = await params;
+    const contactId = parseInt(id);
     if (isNaN(contactId)) {
       return NextResponse.json(
         { success: false, message: 'شناسه مخاطب نامعتبر است' },
@@ -64,7 +65,7 @@ export async function GET(
 // PUT - Update contact
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getEnhancedAuth(request);
   
@@ -73,7 +74,8 @@ export async function PUT(
   }
 
   try {
-    const contactId = parseInt(params.id);
+    const { id } = await params;
+    const contactId = parseInt(id);
     if (isNaN(contactId)) {
       return NextResponse.json(
         { success: false, message: 'شناسه مخاطب نامعتبر است' },
@@ -156,7 +158,7 @@ export async function PUT(
 // DELETE - Delete contact
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await getEnhancedAuth(request);
   
@@ -165,7 +167,8 @@ export async function DELETE(
   }
 
   try {
-    const contactId = parseInt(params.id);
+    const { id } = await params;
+    const contactId = parseInt(id);
     if (isNaN(contactId)) {
       return NextResponse.json(
         { success: false, message: 'شناسه مخاطب نامعتبر است' },

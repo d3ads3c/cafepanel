@@ -5,7 +5,7 @@ interface SideDrawerProps {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  width?: number;
+  width?: number | string;
 }
 
 const SideDrawer: React.FC<SideDrawerProps> = ({ open, onClose, width = 400, children }) => {
@@ -37,7 +37,10 @@ const SideDrawer: React.FC<SideDrawerProps> = ({ open, onClose, width = 400, chi
         className={`absolute left-0 top-0 h-full bg-white shadow-2xl transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ width: `${width}px`, maxWidth: '90vw' }}
+        style={{
+          width: typeof width === "number" ? `${width}px` : width,
+          maxWidth: "90vw",
+        }}
       >
         <div className="h-full flex flex-col">
           {children}

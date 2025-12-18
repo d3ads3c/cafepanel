@@ -31,9 +31,21 @@ export async function POST(request: NextRequest) {
 
     const permissions: string[] = Array.isArray(user.permissions)
       ? user.permissions
-      : (() => { try { return JSON.parse(user.permissions || '[]') } catch { return [] } })()
+      : (() => {
+          try {
+            return JSON.parse(user.permissions || "[]");
+          } catch {
+            return [];
+          }
+        })();
 
-    const token = signPayload({ userId: user.id, username: user.username, permissions })
+    const token = signPayload({
+      userId: user.id,
+      username: user.username,
+      plan: "basic",
+      cafename: user.username || "Cafe",
+      permissions,
+    });
     const response = NextResponse.json({ success: true })
     response.cookies.set({
       name: 'auth_token',

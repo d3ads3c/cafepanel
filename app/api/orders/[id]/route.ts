@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeTransactionOnUserDB } from '@/lib/dbHelper';
+import { executeTransactionOnUserDB, executeQueryOnUserDB } from '@/lib/dbHelper';
 import { getEnhancedAuth } from '@/lib/enhancedAuth';
 import { hasPermission } from '@/lib/permissions';
 import { getUserDatabaseFromRequest } from '@/lib/getUserDB';
