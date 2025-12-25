@@ -25,7 +25,7 @@ export function usePlan() {
         if (response.ok) {
           const data = await response.json();
           const normalizedPlan = normalizePlan(data.plan);
-          console.log(data.plan)
+          // console.log(data.plan)
           setUserPlan({
             plan: normalizedPlan,
             loading: false,

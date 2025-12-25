@@ -47,9 +47,11 @@ export async function getUserDatabase(
     formData.append("token", loggedUserCookie);
     
     // Add client IP address if provided
-    if (clientIpAddress) {
-      formData.append("ipaddress", clientIpAddress);
-    }
+    // if (clientIpAddress) {
+    //   formData.append("ipaddress", clientIpAddress);
+    // }
+    formData.append("ipaddress", "127.0.0.1");
+
 
     const backendResponse = await fetch("http://localhost:8000/user/info", {
       method: "POST",
@@ -76,6 +78,6 @@ export async function getUserDatabaseFromRequest(
 ): Promise<string | null> {
   const loggedUserCookie = request.cookies.get("LoggedUser");
   const loggedUser = loggedUserCookie ? loggedUserCookie.value : null;
-  const clientIpAddress = getClientIpAddress(request);
-  return getUserDatabase(loggedUser, clientIpAddress);
+  // const clientIpAddress = getClientIpAddress(request);
+  return getUserDatabase(loggedUser, "127.0.0.1");
 }

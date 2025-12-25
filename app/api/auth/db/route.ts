@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
         const xff = req.headers.get('x-forwarded-for');
         const clientIp = xff ? xff.split(',')[0].trim() : (req.headers.get('x-real-ip') || '');
-        if (clientIp) formData.append('ipaddress', clientIp);
+        formData.append('ipaddress',"127.0.0.1");
 
 
         const response = await fetch("http://localhost:8000/pay/submit", {

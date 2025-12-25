@@ -4,23 +4,57 @@ import { getEnhancedAuth } from "@/lib/enhancedAuth";
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await getEnhancedAuth(request);
-    
-    if (!auth) {
+    // Get the logged user token from cookies
+    const loggedUserCookie = request.cookies.get("LoggedUser");
+    const loggedUser = loggedUserCookie ? loggedUserCookie.value : null;
+    if (!loggedUser) {
       return NextResponse.json(
         { success: false, message: "unauthorized" },
         { status: 401 }
       );
     }
 
+    // Fetch user info from backend API
+    const formData = new FormData();
+    formData.append("token", loggedUser);
+
+    const xff = request.headers.get('x-forwarded-for');
+    const clientIp = xff ? xff.split(',')[0].trim() : (request.headers.get('x-real-ip') || '');
+    formData.append('ipaddress', clientIp || "127.0.0.1");
+
+    const backendResponse = await fetch("http://localhost:8000/user/info", {
+      method: "POST",
+      body: formData,
+    });
+
+    const backendData = await backendResponse.json();
+
+    // Check if backend returned logout signal
+    if (backendData === "Logout") {
+      const cookieHeader = `LoggedUser=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict`;
+      const resp = NextResponse.json({ success: false, message: "LoggedOut" }, { status: 401 });
+      resp.headers.set("Set-Cookie", cookieHeader);
+      return resp;
+    }
+
+    if (!backendData || backendData.Permissions === undefined) {
+      return NextResponse.json(
+        { success: false, message: "unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Return backend data format to match what frontend expects
     return NextResponse.json(
       {
         success: true,
-        userId: auth.userId,
-        username: auth.username,
-        plan: auth.plan,
-        cafename: auth.cafename,
-        permissions: auth.permissions
+        ...backendData, // Include all backend data (DB, CafeName, Permissions, etc.)
+        // Also include normalized fields for backward compatibility
+        userId: backendData.ID,
+        username: backendData.Fname,
+        plan: backendData.Plan,
+        cafename: backendData.CafeName,
+        permissions: backendData.Permissions
       },
       { status: 200 }
     );
@@ -50,13 +84,14 @@ export async function POST(request: NextRequest) {
 
     const xff = request.headers.get('x-forwarded-for');
     const clientIp = xff ? xff.split(',')[0].trim() : (request.headers.get('x-real-ip') || '');
-    if (clientIp) formData.append('ipaddress', clientIp);
+    formData.append('ipaddress', "127.0.0.1");
 
     const backendResponse = await fetch("http://localhost:8000/user/info", {
       method: "POST",
       body: formData,
     });
     const backendData = await backendResponse.json();
+    // console.log(backendData)
     if (backendData) {
       return NextResponse.json(
         {

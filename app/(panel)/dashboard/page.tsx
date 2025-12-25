@@ -7,7 +7,9 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
 });
 import type { ApexOptions } from "apexcharts";
 import { useToast } from "@/lib/useToast";
-import { getUserPermissions, userHasPermission } from "@/lib/userInfoParser";
+import { userHasPermission } from "@/lib/userInfoParser";
+import { normalizePlan } from "@/lib/plans";
+
 
 type BuyItem = {
   bl_ID: number;
@@ -67,7 +69,7 @@ export default function Dashboard2() {
       const data = await res.json();
       const userInfo = data?.Info;
       const name = userInfo?.Fname || "کاربر";
-      setPlan(userInfo.Plan);
+      setPlan(normalizePlan(userInfo.Plan));
       setDisplayName(name);
       const hasPermission = userHasPermission(data, "view_dashboard");
       setCanView(hasPermission);

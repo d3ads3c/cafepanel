@@ -3,7 +3,7 @@ import NavBar from "@/components/NavBar";
 import MobileHead from "@/components/HeadBar";
 import DesktopSidebar from "@/components/DesktopSidebar";
 import DesktopHeader from "@/components/DesktopHeader";
-
+// import DebugModal from "@/components/DebugModal";
 
 export const metadata: Metadata = {
   title: "پنل مدیریت کسب و کار آرمان آپس",
@@ -42,6 +42,7 @@ export default function MainLayout({
           </main>
         </div>
       </div>
+      {/* <DebugModal /> */}
     </div>
   );
 }

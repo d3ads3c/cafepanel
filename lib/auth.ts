@@ -72,5 +72,49 @@ export async function clearAuthCookie() {
 
 export async function getAuth(): Promise<AuthPayload | null> {
   const token = (await cookies()).get("LoggedUser")?.value;
-  return verifyToken(token);
+  
+  if (!token) {
+    return null;
+  }
+
+  try {
+    // Call backend API to verify token and get user info
+    const formData = new FormData();
+    formData.append("token", token);
+    formData.append("ipaddress", "127.0.0.1");
+
+    const backendResponse = await fetch("http://localhost:8000/user/info", {
+      method: "POST",
+      body: formData,
+    });
+
+    const backendData = await backendResponse.json();
+    
+    // Check if backend returned logout signal
+    if (backendData === "Logout" || !backendData || backendData.Permissions === undefined) {
+      return null;
+    }
+
+    // Import parsePermissions and normalizePlan dynamically to avoid circular dependencies
+    const { parsePermissions } = await import("./permissions");
+    const { normalizePlan } = await import("./plans");
+
+    // Create AuthPayload from backend response
+    const parsedPermissions = parsePermissions(backendData.Permissions);
+    const normalizedPlan = normalizePlan(backendData.Plan);
+    
+    const authPayload: AuthPayload = {
+      userId: backendData.ID,
+      username: backendData.Fname || "User",
+      plan: normalizedPlan,
+      cafename: backendData.CafeName,
+      permissions: parsedPermissions,
+      exp: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+    };
+
+    return authPayload;
+  } catch (error) {
+    console.error("[Auth] Error fetching from backend:", error);
+    return null;
+  }
 }

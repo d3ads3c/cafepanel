@@ -9,7 +9,7 @@ export function proxy(request: NextRequest) {
   const isProtected = protectedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
   if (isProtected && !token) {
-    const url = new URL('https://cafegah.ir/login', request.url)
+    const url = new URL('http://10.77.119.13:3055/login', request.url)
     url.searchParams.set('next', pathname)
     return NextResponse.redirect(url)
   }
